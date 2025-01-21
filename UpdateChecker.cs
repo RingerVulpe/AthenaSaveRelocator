@@ -156,16 +156,43 @@ namespace AthenaSaveRelocator
                 ZipFile.ExtractToDirectory(tempPath, extractPath);
                 Logger.Log("Update extracted successfully.");
 
-                // Move all files to the current directory
+                // Identify if there's a new folder in the extracted update
+                var newDirectories = Directory.GetDirectories(extractPath);
                 string updaterScript = Path.Combine(extractPath, "Updater.bat");
-                File.WriteAllText(updaterScript, $@"
+                string scriptContent;
+
+                if (newDirectories.Length > 0)
+                {
+                    // Use the first directory found as the new folder
+                    string newFolderPath = newDirectories[0];
+                    string newFolderName = Path.GetFileName(newFolderPath);
+                    string parentDir = Directory.GetParent(appDirectory)?.FullName
+                                       ?? throw new Exception("Unable to determine parent directory.");
+                    string exeName = Path.GetFileName(currentExePath);
+
+                    // Create an updater script to move the new folder, remove the old one, and start the new exe
+                    scriptContent = $@"
+@echo off
+timeout /t 3 /nobreak >nul
+move ""{Path.Combine(extractPath, newFolderName)}"" ""{Path.Combine(parentDir, newFolderName)}""
+rmdir /S /Q ""{appDirectory}""
+start """" ""{Path.Combine(parentDir, newFolderName, exeName)}""
+exit
+";
+                }
+                else
+                {
+                    // Fallback: If no new folder found, copy files into the current directory
+                    scriptContent = $@"
 @echo off
 timeout /t 3 /nobreak >nul
 xcopy /Y /E /C /I ""{extractPath}"" ""{appDirectory}""
 start """" ""{currentExePath}""
 exit
-");
+";
+                }
 
+                File.WriteAllText(updaterScript, scriptContent);
                 Logger.Log("Launching updater script and exiting...");
                 Process.Start(new ProcessStartInfo
                 {
@@ -182,6 +209,7 @@ exit
                 MessageBox.Show($"Update failed: {ex.Message}", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
 
         public class GithubRelease
