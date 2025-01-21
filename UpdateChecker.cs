@@ -9,58 +9,75 @@ using System.IO.Compression;
 
 namespace AthenaSaveRelocator
 {
-    /// <summary>
-    /// Handles checking for updates from GitHub or another update source.
-    /// </summary>
     internal class UpdateChecker
     {
-        private const string VersionFileUrl = "https://raw.githubusercontent.com/RingerVulpe/AthenaSaveRelocator/main/version.json"; // Corrected URL
+        private const string VersionFileUrl = "https://raw.githubusercontent.com/RingerVulpe/AthenaSaveRelocator/main/version.json";
         private const string ApiUrl = "https://api.github.com/repos/RingerVulpe/AthenaSaveRelocator/releases/latest";
-
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public static readonly string CurrentVersion = "1.1.1"; // Change this before release
+        public static readonly string CurrentVersion = VersionInfo.CurrentVersion;
 
-        /// <summary>
-        /// Checks if a newer version exists on GitHub.
-        /// </summary>
         public static async Task CheckForUpdates()
         {
             try
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AthenaSaveRelocator-Updater");
+                string jsonUrl = VersionFileUrl + "?t=" + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-                string jsonData = await _httpClient.GetStringAsync(VersionFileUrl);
-                var versionInfo = JsonSerializer.Deserialize<VersionInfoData>(jsonData);
+                Logger.Log("Checking for updates...");
+                string jsonData = await _httpClient.GetStringAsync(jsonUrl);
 
-                if (versionInfo != null && IsNewerVersion(versionInfo.Version, CurrentVersion))
+                if (string.IsNullOrWhiteSpace(jsonData))
                 {
+                    Logger.Log("Error: Received empty response from version.json");
+                    return;
+                }
+
+                var versionInfo = JsonSerializer.Deserialize<VersionInfoData>(jsonData);
+                if (versionInfo == null || string.IsNullOrEmpty(versionInfo.Version))
+                {
+                    Logger.Log("Error: Invalid version.json format or missing version number.");
+                    return;
+                }
+
+                Logger.Log($"Latest version found: {versionInfo.Version}, Current version: {CurrentVersion}");
+
+                if (IsNewerVersion(versionInfo.Version, CurrentVersion))
+                {
+                    Logger.Log("New update available! Prompting user...");
                     await ShowUpdateNotification(versionInfo.Version);
                 }
                 else
                 {
+                    Logger.Log("You're already using the latest version.");
                     MessageBox.Show("You're using the latest version.", "No Updates Available", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
+            catch (HttpRequestException ex)
+            {
+                Logger.Log($"HTTP Error while checking for updates: {ex.Message}");
+            }
             catch (Exception ex)
             {
-                Logger.Log($"Error checking for updates: {ex.Message}");
+                Logger.Log($"Unexpected error while checking for updates: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Compares version strings (e.g., "1.2.0" > "1.0.5").
-        /// </summary>
         private static bool IsNewerVersion(string latestVersion, string currentVersion)
         {
-            Version latest = new Version(latestVersion);
-            Version current = new Version(currentVersion);
-            return latest > current;
+            try
+            {
+                Version latest = new Version(latestVersion);
+                Version current = new Version(currentVersion);
+                return latest > current;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Version comparison error: {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Displays a tray notification if an update is available.
-        /// </summary>
         private static async Task ShowUpdateNotification(string latestVersion)
         {
             var result = MessageBox.Show(
@@ -72,13 +89,15 @@ namespace AthenaSaveRelocator
 
             if (result == DialogResult.Yes)
             {
+                Logger.Log("User accepted the update.");
                 await DownloadAndUpdate();
+            }
+            else
+            {
+                Logger.Log("User declined the update.");
             }
         }
 
-        /// <summary>
-        /// Downloads and updates the application with the latest version.
-        /// </summary>
         private static async Task DownloadAndUpdate()
         {
             string tempPath = Path.Combine(Path.GetTempPath(), "AthenaUpdate.zip");
@@ -86,76 +105,77 @@ namespace AthenaSaveRelocator
 
             try
             {
+                Logger.Log("Fetching latest release from GitHub...");
                 string jsonData = await _httpClient.GetStringAsync(ApiUrl);
-                var releaseData = JsonSerializer.Deserialize<GithubRelease>(jsonData);
 
-                if (releaseData == null || releaseData.assets.Length == 0)
+                if (string.IsNullOrWhiteSpace(jsonData))
                 {
-                    MessageBox.Show("No update found!", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Log("Error: GitHub API returned an empty response.");
                     return;
                 }
 
-                // Find the correct asset URL (ZIP file)
+                var releaseData = JsonSerializer.Deserialize<GithubRelease>(jsonData);
+                if (releaseData == null || releaseData.assets == null || releaseData.assets.Length == 0)
+                {
+                    Logger.Log("Error: Failed to fetch latest release data or no assets found.");
+                    return;
+                }
+
                 string? zipUrl = releaseData.assets
                     .FirstOrDefault(a => a.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))?.browser_download_url;
 
                 if (string.IsNullOrEmpty(zipUrl))
                 {
-                    MessageBox.Show("Update ZIP not found!", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Log("Error: Update ZIP file not found in the release assets.");
                     return;
                 }
 
-                // Download the ZIP file
+                Logger.Log("Downloading update...");
                 byte[] fileBytes = await _httpClient.GetByteArrayAsync(zipUrl);
                 await File.WriteAllBytesAsync(tempPath, fileBytes);
 
                 if (Directory.Exists(extractPath))
+                {
                     Directory.Delete(extractPath, true);
+                }
 
                 ZipFile.ExtractToDirectory(tempPath, extractPath);
+                Logger.Log("Update extracted successfully.");
 
-                // Replace the executable
                 string newExePath = Path.Combine(extractPath, "AthenaSaveRelocator.exe");
                 string currentExePath = Application.ExecutablePath;
 
+                Logger.Log("Replacing old executable with the new one...");
                 Process.Start(new ProcessStartInfo("cmd", $"/c timeout 3 && move \"{newExePath}\" \"{currentExePath}\" && start \"{currentExePath}\"")
                 {
                     WindowStyle = ProcessWindowStyle.Hidden
                 });
 
+                Logger.Log("Restarting application after update...");
                 Application.Exit();
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error downloading update: {ex.Message}");
+                Logger.Log($"Error during update process: {ex.Message}");
                 MessageBox.Show($"Update failed: {ex.Message}", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        /// <summary>
-        /// Represents the GitHub API response for latest release.
-        /// </summary>
         public class GithubRelease
         {
             public string tag_name { get; set; }
             public GithubAsset[] assets { get; set; }
         }
 
-        /// <summary>
-        /// Represents an asset (file) in a GitHub release.
-        /// </summary>
         public class GithubAsset
         {
             public string name { get; set; }
             public string browser_download_url { get; set; }
         }
-    }
 
-    /// <summary>
-    /// Represents the version data from version.json
-    /// </summary>
-    public class VersionInfoData
-    {
-        public string Version { get; set; }
+        public class VersionInfoData
+        {
+            public string Version { get; set; }
+        }
     }
 }
