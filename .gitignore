@@ -1,0 +1,123 @@
+# Ignore Visual Studio specific files
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.sln.ide
+
+# Ignore Build Outputs
+bin/
+obj/
+[Bb]uild/
+[Ll]ogs/
+*.pdb
+*.exe
+*.dll
+*.app/
+*.ipa
+*.so
+*.dylib
+*.lib
+*.a
+
+# Ignore Temporary Files
+*.tmp
+*.cache
+*.log
+*.ncb
+*.sdf
+*.swo
+*.swp
+*.bak
+*.db
+*.db-shm
+*.db-wal
+
+# Ignore NuGet Packages
+*.nupkg
+packages/
+.nuget/
+!nuget.config
+!packages.config
+!*.nuspec
+
+# Ignore Rider & ReSharper files
+.idea/
+*.DotSettings.user
+*.resharper
+
+# Ignore JetBrains Rider IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Ignore auto-generated files
+obj/
+bin/
+*.suo
+*.user
+*.rsuser
+*.sln*
+*.csproj.user
+*.pidb
+*.pdb
+*.moc
+*.ilk
+*.exp
+*.idb
+
+# Ignore Rider-specific files
+.idea/
+*.sln.iml
+*.run/
+
+# Ignore temporary build files
+out/
+temp/
+*.tmp
+*.cache
+*.bak
+
+# Ignore user-specific files
+*.config
+*.preferences
+*.history
+*.swp
+*.swo
+*.swn
+
+# Ignore Debugging Files
+*.tlog
+*.lastbuildstate
+*.trace
+*.csproj.FileListAbsolute.txt
+*.csproj.nuget.cache
+*.csproj.nuget.g.props
+*.csproj.nuget.g.targets
+*.dotCover
+*.dotTrace
+*.dotMemory
+
+# Ignore local configuration
+local.settings.json
+
+# Ignore log files
+logs/
+*.log
+*.log.*
+AthenaSaveRelocator.log
+
+# Ignore GitHub-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ignore backup and update files
+Backup/
+AthenaUpdate/
+AthenaUpdate.zip
+
+# Ignore GitHub update version file if hosted in the repo
+version.json
