@@ -181,7 +181,7 @@ namespace AthenaSaveRelocator
                 _currentBalloonMode = BalloonMode.CloudNewerAtStartup;
 
                 // Show a balloon tip for 6 seconds
-                _balloonNotifier.ShowBalloonNotification(
+                _balloonNotifier.ShowNotification(
                     _trayIcon,
                     "AthenaSaveRelocator",
                     "We found newer cloud saves. Click here to restore them.",
@@ -239,7 +239,7 @@ namespace AthenaSaveRelocator
                     Logger.Log("Detected updated local save files after game exit. Showing balloon notification.");
                     _currentBalloonMode = BalloonMode.LocalChangedAfterGame;
 
-                    _balloonNotifier.ShowBalloonNotification(
+                    _balloonNotifier.ShowNotification(
                         _trayIcon,
                         "AthenaSaveRelocator",
                         "Game closed - new local saves found. Click here to upload.",

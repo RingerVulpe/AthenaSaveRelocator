@@ -4,29 +4,73 @@ using System.Windows.Forms;
 namespace AthenaSaveRelocator
 {
     /// <summary>
-    /// Manages showing balloon tooltips for the NotifyIcon.
+    /// Manages showing notifications for the NotifyIcon with a fallback to a window.
     /// </summary>
     internal class BalloonNotifier
     {
         /// <summary>
-        /// Displays a balloon notification with the given title, text, and timeout.
+        /// Displays a notification with the given title, text, and timeout.
+        /// If the balloon notification does not appear, a fallback window is displayed.
         /// </summary>
-        public void ShowBalloonNotification(
-            NotifyIcon trayIcon,
-            string title,
-            string text,
-            int timeoutMs = 3000)
+        public void ShowNotification(NotifyIcon trayIcon, string title, string text, int timeoutMs = 3000)
         {
-            // Force the tray icon to re-initialize so Windows doesn't ignore repeated balloons
-            trayIcon.Visible = false;
-            trayIcon.Visible = true;
+            try
+            {
+                // Dispose and recreate the NotifyIcon to ensure it shows
+                trayIcon.Dispose();
+                trayIcon = new NotifyIcon
+                {
+                    Icon = SystemIcons.Information,
+                    Visible = true,
+                    BalloonTipTitle = title,
+                    BalloonTipText = $"{text} ({DateTime.Now:HH:mm:ss})",
+                    BalloonTipIcon = ToolTipIcon.Info
+                };
 
-            // Append a short timestamp to ensure uniqueness
-            trayIcon.BalloonTipTitle = title;
-            trayIcon.BalloonTipText = $"{text} ({DateTime.Now:HH:mm:ss})";
-            trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                // Show balloon tip
+                trayIcon.ShowBalloonTip(timeoutMs);
 
-            trayIcon.ShowBalloonTip(timeoutMs);
+                // Start a timer to check if the balloon was displayed
+                System.Windows.Forms.Timer fallbackTimer = new System.Windows.Forms.Timer { Interval = timeoutMs + 500 }; // Add a small buffer
+                fallbackTimer.Tick += (sender, args) =>
+                {
+                    fallbackTimer.Stop();
+                    fallbackTimer.Dispose();
+
+                    // Check if the notification was visible
+                    if (!BalloonDisplayedRecently())
+                    {
+                        // Show fallback window
+                        ShowFallbackWindow(title, text);
+                    }
+                };
+                fallbackTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                // In case of an exception, log it and show the fallback immediately
+                Console.WriteLine($"Error showing notification: {ex.Message}");
+                ShowFallbackWindow(title, text);
+            }
+        }
+
+        /// <summary>
+        /// Simulates a check to determine if the balloon notification was displayed.
+        /// Note: Adjust as needed based on actual requirements.
+        /// </summary>
+        private bool BalloonDisplayedRecently()
+        {
+            // Windows API or NotifyIcon status check can be implemented here
+            // This is a placeholder logic
+            return false;
+        }
+
+        /// <summary>
+        /// Shows a fallback window notification if the balloon notification fails.
+        /// </summary>
+        private void ShowFallbackWindow(string title, string text)
+        {
+            MessageBox.Show(text, title, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }

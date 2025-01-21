@@ -33,10 +33,22 @@ namespace AthenaSaveRelocator
                     return;
                 }
 
-                var versionInfo = JsonSerializer.Deserialize<VersionInfoData>(jsonData);
+                Logger.Log($"Raw JSON response: {jsonData}");
+
+                VersionInfoData versionInfo;
+                try
+                {
+                    versionInfo = JsonSerializer.Deserialize<VersionInfoData>(jsonData);
+                }
+                catch (JsonException jsonEx)
+                {
+                    Logger.Log($"JSON Parsing Error: {jsonEx.Message}");
+                    return;
+                }
+
                 if (versionInfo == null || string.IsNullOrEmpty(versionInfo.Version))
                 {
-                    Logger.Log("Error: Invalid version.json format or missing version number.");
+                    Logger.Log("Error: JSON is valid but missing 'Version' property.");
                     return;
                 }
 
@@ -102,6 +114,8 @@ namespace AthenaSaveRelocator
         {
             string tempPath = Path.Combine(Path.GetTempPath(), "AthenaUpdate.zip");
             string extractPath = Path.Combine(Path.GetTempPath(), "AthenaUpdate");
+            string currentExePath = Application.ExecutablePath;
+            string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             try
             {
@@ -115,7 +129,7 @@ namespace AthenaSaveRelocator
                 }
 
                 var releaseData = JsonSerializer.Deserialize<GithubRelease>(jsonData);
-                if (releaseData == null || releaseData.assets == null || releaseData.assets.Length == 0)
+                if (releaseData?.assets == null || releaseData.assets.Length == 0)
                 {
                     Logger.Log("Error: Failed to fetch latest release data or no assets found.");
                     return;
@@ -142,16 +156,24 @@ namespace AthenaSaveRelocator
                 ZipFile.ExtractToDirectory(tempPath, extractPath);
                 Logger.Log("Update extracted successfully.");
 
-                string newExePath = Path.Combine(extractPath, "AthenaSaveRelocator.exe");
-                string currentExePath = Application.ExecutablePath;
+                // Move all files to the current directory
+                string updaterScript = Path.Combine(extractPath, "Updater.bat");
+                File.WriteAllText(updaterScript, $@"
+@echo off
+timeout /t 3 /nobreak >nul
+xcopy /Y /E /C /I ""{extractPath}"" ""{appDirectory}""
+start """" ""{currentExePath}""
+exit
+");
 
-                Logger.Log("Replacing old executable with the new one...");
-                Process.Start(new ProcessStartInfo("cmd", $"/c timeout 3 && move \"{newExePath}\" \"{currentExePath}\" && start \"{currentExePath}\"")
+                Logger.Log("Launching updater script and exiting...");
+                Process.Start(new ProcessStartInfo
                 {
+                    FileName = updaterScript,
+                    UseShellExecute = true,
                     WindowStyle = ProcessWindowStyle.Hidden
                 });
 
-                Logger.Log("Restarting application after update...");
                 Application.Exit();
             }
             catch (Exception ex)
@@ -160,6 +182,7 @@ namespace AthenaSaveRelocator
                 MessageBox.Show($"Update failed: {ex.Message}", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         public class GithubRelease
         {

@@ -2,6 +2,7 @@
 {
     public static class VersionInfo
     {
-        public const string CurrentVersion = "1.1.1"; // Change this before release
+        //create a public const string CurrentVersion from the version.json file, deserialized
+        public const string CurrentVersion = "1.1.2";
     }
 }
