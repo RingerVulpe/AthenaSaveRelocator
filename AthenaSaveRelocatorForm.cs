@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using System.Diagnostics;  // Added for Process support
 
 namespace AthenaSaveRelocator
 {
@@ -44,6 +45,8 @@ namespace AthenaSaveRelocator
         // Update checker
         private System.Windows.Forms.Timer _updateCheckTimer;
 
+        // Newly added field for process watching
+        private Process _gameProcess;
 
         #endregion
 
@@ -149,6 +152,9 @@ namespace AthenaSaveRelocator
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
+
+            // *** FIX: Hook the balloon tip click event ***
+            _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
         }
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
         {
@@ -196,60 +202,79 @@ namespace AthenaSaveRelocator
 
         private void PollForGameProcess()
         {
+            // Only attempt to start watching if we aren't already monitoring a process
+            if (!_wasGameRunning)
+            {
+                StartWatchingGameProcess();
+            }
+            // Exiting is handled by the Exited event, so no further action is needed here.
+        }
+
+        private void StartWatchingGameProcess()
+        {
             if (string.IsNullOrWhiteSpace(_gameProcessName))
             {
                 // No process to watch
                 return;
             }
 
-            bool isRunning = _gameWatcher.IsGameRunning();
-            // Transition: Not Running -> Running
-            if (isRunning && !_wasGameRunning)
+            Process process = _gameWatcher.GetGameProcess();
+            if (process != null)
             {
+                _gameProcess = process;
+                _gameProcess.EnableRaisingEvents = true;
+                _gameProcess.Exited += OnGameProcessExited;
+
                 // Record the current snapshot of local saves
                 _preGameModTimes = TakeSaveFileSnapshot(_localPath);
                 _wasGameRunning = true;
                 Logger.Log($"Detected '{_gameProcessName}.exe' started. Capturing local save timestamps.");
             }
+        }
 
-            // Transition: Running -> Not Running
-            if (!isRunning && _wasGameRunning)
+        private void OnGameProcessExited(object sender, EventArgs e)
+        {
+            if (_gameProcess != null)
             {
-                _wasGameRunning = false;
-                Logger.Log($"Detected '{_gameProcessName}.exe' exited. Checking for changed local saves...");
+                _gameProcess.Exited -= OnGameProcessExited;
+                _gameProcess.Dispose();
+                _gameProcess = null;
+            }
 
-                var postGameModTimes = TakeSaveFileSnapshot(_localPath);
-                bool anyChanged = false;
+            _wasGameRunning = false;
+            Logger.Log($"Detected '{_gameProcessName}.exe' exited. Checking for changed local saves...");
 
-                // Compare each file
-                foreach (var kvp in postGameModTimes)
+            var postGameModTimes = TakeSaveFileSnapshot(_localPath);
+            bool anyChanged = false;
+
+            // Compare each file
+            foreach (var kvp in postGameModTimes)
+            {
+                string file = kvp.Key;
+                DateTime newTime = kvp.Value;
+
+                if (!_preGameModTimes.ContainsKey(file) || newTime > _preGameModTimes[file])
                 {
-                    string file = kvp.Key;
-                    DateTime newTime = kvp.Value;
-
-                    if (!_preGameModTimes.ContainsKey(file) || newTime > _preGameModTimes[file])
-                    {
-                        anyChanged = true;
-                        break;
-                    }
+                    anyChanged = true;
+                    break;
                 }
+            }
 
-                if (anyChanged)
-                {
-                    Logger.Log("Detected updated local save files after game exit. Showing balloon notification.");
-                    _currentBalloonMode = BalloonMode.LocalChangedAfterGame;
+            if (anyChanged)
+            {
+                Logger.Log("Detected updated local save files after game exit. Showing balloon notification.");
+                _currentBalloonMode = BalloonMode.LocalChangedAfterGame;
 
-                    _balloonNotifier.ShowNotification(
-                        _trayIcon,
-                        "AthenaSaveRelocator",
-                        "Game closed - new local saves found. Click here to upload.",
-                        6000
-                    );
-                }
-                else
-                {
-                    Logger.Log("No local save changes detected after game exit.");
-                }
+                _balloonNotifier.ShowNotification(
+                    _trayIcon,
+                    "AthenaSaveRelocator",
+                    "Game closed - new local saves found. Click here to upload.",
+                    6000
+                );
+            }
+            else
+            {
+                Logger.Log("No local save changes detected after game exit.");
             }
         }
 

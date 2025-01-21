@@ -35,5 +35,25 @@ namespace AthenaSaveRelocator
                 return false;
             }
         }
+
+        /// <summary>
+        /// Returns the running game process if found; otherwise null.
+        /// </summary>
+        public Process GetGameProcess()
+        {
+            if (string.IsNullOrWhiteSpace(_gameProcessName))
+                return null;
+
+            try
+            {
+                var processes = Process.GetProcessesByName(_gameProcessName);
+                return processes.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"ERROR getting game process '{_gameProcessName}': {ex.Message}");
+                return null;
+            }
+        }
     }
 }

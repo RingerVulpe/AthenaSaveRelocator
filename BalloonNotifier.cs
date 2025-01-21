@@ -16,16 +16,13 @@ namespace AthenaSaveRelocator
         {
             try
             {
-                // Dispose and recreate the NotifyIcon to ensure it shows
-                trayIcon.Dispose();
-                trayIcon = new NotifyIcon
-                {
-                    Icon = SystemIcons.Information,
-                    Visible = true,
-                    BalloonTipTitle = title,
-                    BalloonTipText = $"{text} ({DateTime.Now:HH:mm:ss})",
-                    BalloonTipIcon = ToolTipIcon.Info
-                };
+                // *** FIX: Do NOT dispose and recreate the NotifyIcon. ***
+                // Instead, reuse the existing trayIcon so the click handler remains attached.
+                trayIcon.Icon = SystemIcons.Information;
+                trayIcon.Visible = true;
+                trayIcon.BalloonTipTitle = title;
+                trayIcon.BalloonTipText = $"{text} ({DateTime.Now:HH:mm:ss})";
+                trayIcon.BalloonTipIcon = ToolTipIcon.Info;
 
                 // Show balloon tip
                 trayIcon.ShowBalloonTip(timeoutMs);
