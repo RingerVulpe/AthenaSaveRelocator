@@ -41,6 +41,10 @@ namespace AthenaSaveRelocator
         private CloudChecker _cloudChecker;
         private BalloonNotifier _balloonNotifier;
 
+        // Update checker
+        private System.Windows.Forms.Timer _updateCheckTimer;
+
+
         #endregion
 
         #region Constructor and Initialization
@@ -135,6 +139,7 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
             _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
             _trayIcon = new NotifyIcon
@@ -144,21 +149,27 @@ namespace AthenaSaveRelocator
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
-
-            // On balloon tip click, we decide how to respond
-            _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
-
-            // Update tooltip each time mouse hovers (to reflect last sync time etc.)
-            _trayIcon.MouseMove += (s, e) => { _trayIcon.Text = BuildTrayTooltip(); };
         }
+        private void OnCheckForUpdatesClicked(object sender, EventArgs e)
+        {
+            UpdateChecker.CheckForUpdates();
+        }
+
 
         private void InitializePollingTimer()
         {
             _pollGameTimer = new System.Windows.Forms.Timer();
-            _pollGameTimer.Interval = 5000; // poll every 5 seconds
+            _pollGameTimer.Interval = 5000; // Poll every 5 seconds
             _pollGameTimer.Tick += (s, e) => PollForGameProcess();
             _pollGameTimer.Start();
+
+            // Auto-update check every 24 hours
+            _updateCheckTimer = new System.Windows.Forms.Timer();
+            _updateCheckTimer.Interval = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            _updateCheckTimer.Tick += (s, e) => UpdateChecker.CheckForUpdates();
+            _updateCheckTimer.Start();
         }
+
 
         private void CheckCloudNewerAtStartup()
         {
