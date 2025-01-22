@@ -76,6 +76,9 @@ namespace AthenaSaveRelocator
 
             // 5. Check whether cloud is newer right after startup
             CheckCloudNewerAtStartup();
+
+            // 6. Check for updates
+            UpdateChecker.CheckForUpdates();
         }
 
         private void LoadConfiguration()

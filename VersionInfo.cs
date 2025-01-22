@@ -2,6 +2,6 @@
 {
     public static class VersionInfo
     {
-        public const string CurrentVersion = "1.1.5";
+        public const string CurrentVersion = "1.1.52";
     }
 }
