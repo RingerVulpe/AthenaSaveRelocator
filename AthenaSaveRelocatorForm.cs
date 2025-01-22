@@ -5,7 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using System.Diagnostics;  // Added for Process support
+using System.Diagnostics;
+using System.Reflection;  // For Assembly and reflection methods
 
 namespace AthenaSaveRelocator
 {
@@ -58,18 +59,9 @@ namespace AthenaSaveRelocator
             Text = "AthenaSaveRelocator (Hidden Form)";
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
-            //set the app icon for taskbar to the athena app icon if its available 
-            Icon = new Icon(SystemIcons.Information, 40, 40);
 
-            if(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico") != null)
-            {
-                Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
-            }
-            else 
-            {
-                //logger that the icon is not found 
-                Logger.Log("App Icon not found");
-            }
+            // Load icon from Athena/Resources folder for the taskbar icon
+            Icon = LoadAppIcon();
 
             // 1. Load config from pathFile.txt
             LoadConfiguration();
@@ -91,6 +83,20 @@ namespace AthenaSaveRelocator
 
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
+        }
+
+        private Icon LoadAppIcon()
+        {
+            string iconPath = Path.Combine(Application.StartupPath, "Athena", "Resources", "app.ico");
+            if (File.Exists(iconPath))
+            {
+                return new Icon(iconPath);
+            }
+            else
+            {
+                Logger.Log($"App Icon not found at: {iconPath}");
+                return new Icon(SystemIcons.Information, 40, 40);
+            }
         }
 
         private void LoadConfiguration()
@@ -157,37 +163,28 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
             _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
-            //load the icon app.ico from the resources
-            Stream iconStream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico");
-
-            //init the icon with the system information icon
-            Icon icon = new Icon(SystemIcons.Information, 40, 40);
-
-            if(iconStream != null)
-            {
-                icon = new Icon(iconStream);
-            }
-
+            // Load the icon for tray from Athena/Resources
+            Icon trayIconImage = LoadAppIcon();
 
             _trayIcon = new NotifyIcon
             {
                 Text = BuildTrayTooltip(),
-                Icon = icon,
+                Icon = trayIconImage,
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
 
-            // *** FIX: Hook the balloon tip click event ***
+            // Hook the balloon tip click event
             _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
         }
+
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
         {
             UpdateChecker.CheckForUpdates();
         }
-
 
         private void InitializePollingTimer()
         {
@@ -202,7 +199,6 @@ namespace AthenaSaveRelocator
             _updateCheckTimer.Tick += (s, e) => UpdateChecker.CheckForUpdates();
             _updateCheckTimer.Start();
         }
-
 
         private void CheckCloudNewerAtStartup()
         {
@@ -264,8 +260,6 @@ namespace AthenaSaveRelocator
 
         private void OnGameProcessExited(object sender, EventArgs e)
         {
-
-
             if (_gameProcess != null)
             {
                 _gameProcess.Exited -= OnGameProcessExited;
@@ -490,18 +484,17 @@ namespace AthenaSaveRelocator
 
         private string BuildTrayTooltip()
         {
-            var lastSyncStr = (_lastSyncTime == DateTime.MinValue)
+            string lastSyncStr = (_lastSyncTime == DateTime.MinValue)
                 ? "No sync yet"
-                : "Synced" + _lastSyncTime.ToString("yyyy-MM-dd HH:mm");
+                : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
 
+            // Prepend a green circle emoji if synced
             if (_lastSyncTime != DateTime.MinValue)
             {
-                var greenSynced = "<font color='green'>Synced</font>";
-
-                lastSyncStr = lastSyncStr.Replace("Synced", greenSynced);
+                lastSyncStr = lastSyncStr.Replace("Synced", "🟢 Synced");
             }
 
-            var gameStatus = "No Game Monitoring";
+            string gameStatus = "No Game Monitoring";
             if (!string.IsNullOrWhiteSpace(_gameProcessName))
             {
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
@@ -510,7 +503,6 @@ namespace AthenaSaveRelocator
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
 
-        //update build tray tooltip
         private void UpdateTrayTooltip()
         {
             _trayIcon.Text = BuildTrayTooltip();
