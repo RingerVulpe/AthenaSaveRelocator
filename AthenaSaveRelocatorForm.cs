@@ -58,6 +58,18 @@ namespace AthenaSaveRelocator
             Text = "AthenaSaveRelocator (Hidden Form)";
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
+            //set the app icon for taskbar to the athena app icon if its available 
+            Icon = new Icon(SystemIcons.Information, 40, 40);
+
+            if (System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico") != null)
+            {
+                Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
+            }
+            else
+            {
+                //logger that the icon is not found 
+                Logger.Log("App Icon not found");
+            }
 
             // 1. Load config from pathFile.txt
             LoadConfiguration();
@@ -148,8 +160,17 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
+            //load the icon app.ico from the resources
+            Stream iconStream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico");
+
             //init the icon with the system information icon
             Icon icon = new Icon(SystemIcons.Information, 40, 40);
+
+            if (iconStream != null)
+            {
+                icon = new Icon(iconStream);
+            }
+
 
             _trayIcon = new NotifyIcon
             {
@@ -487,6 +508,8 @@ namespace AthenaSaveRelocator
 
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
+
+
         //update build tray tooltip
         private void UpdateTrayTooltip()
         {
