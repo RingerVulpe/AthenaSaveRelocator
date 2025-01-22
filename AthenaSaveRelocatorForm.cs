@@ -469,18 +469,17 @@ namespace AthenaSaveRelocator
 
         private string BuildTrayTooltip()
         {
-            var lastSyncStr = (_lastSyncTime == DateTime.MinValue)
+            string lastSyncStr = (_lastSyncTime == DateTime.MinValue)
                 ? "No sync yet"
-                : "Synced" + _lastSyncTime.ToString("yyyy-MM-dd HH:mm");
+                : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
 
+            // Prepend a green circle emoji if synced
             if (_lastSyncTime != DateTime.MinValue)
             {
-                var greenSynced = "<font color='green'>Synced</font>";
-
-                lastSyncStr = lastSyncStr.Replace("Synced", greenSynced);
+                lastSyncStr = lastSyncStr.Replace("Synced", "🟢 Synced");
             }
 
-            var gameStatus = "No Game Monitoring";
+            string gameStatus = "No Game Monitoring";
             if (!string.IsNullOrWhiteSpace(_gameProcessName))
             {
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
@@ -488,7 +487,6 @@ namespace AthenaSaveRelocator
 
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
-
         //update build tray tooltip
         private void UpdateTrayTooltip()
         {
