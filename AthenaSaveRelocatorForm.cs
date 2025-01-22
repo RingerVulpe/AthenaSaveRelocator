@@ -488,7 +488,7 @@ namespace AthenaSaveRelocator
 
         private string BuildTrayTooltip()
         {
-            string lastSyncStr = (AreSavesSynced())
+            string lastSyncStr = (!AreSavesSynced())
                 ? "No sync yet"
                 : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
 
