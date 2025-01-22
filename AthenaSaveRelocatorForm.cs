@@ -58,6 +58,8 @@ namespace AthenaSaveRelocator
             Text = "AthenaSaveRelocator (Hidden Form)";
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
+            //set the app icon for taskbar to the athena app icon 
+            Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
 
             // 1. Load config from pathFile.txt
             LoadConfiguration();
@@ -148,10 +150,22 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
+            //load the icon app.ico from the resources
+            Stream iconStream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico");
+
+            //init the icon with the system information icon
+            Icon icon = new Icon(SystemIcons.Information, 40, 40);
+
+            if(iconStream != null)
+            {
+                icon = new Icon(iconStream);
+            }
+
+
             _trayIcon = new NotifyIcon
             {
                 Text = BuildTrayTooltip(),
-                Icon = SystemIcons.Information,
+                Icon = icon,
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
