@@ -240,6 +240,8 @@ namespace AthenaSaveRelocator
 
         private void OnGameProcessExited(object sender, EventArgs e)
         {
+
+
             if (_gameProcess != null)
             {
                 _gameProcess.Exited -= OnGameProcessExited;
@@ -252,6 +254,8 @@ namespace AthenaSaveRelocator
 
             var postGameModTimes = TakeSaveFileSnapshot(_localPath);
             bool anyChanged = false;
+            //update build tray tooltip
+            UpdateTrayTooltip();
 
             // Compare each file
             foreach (var kvp in postGameModTimes)
@@ -464,7 +468,14 @@ namespace AthenaSaveRelocator
         {
             var lastSyncStr = (_lastSyncTime == DateTime.MinValue)
                 ? "No sync yet"
-                : _lastSyncTime.ToString("yyyy-MM-dd HH:mm");
+                : "Synced" + _lastSyncTime.ToString("yyyy-MM-dd HH:mm");
+
+            if (_lastSyncTime != DateTime.MinValue)
+            {
+                var greenSynced = "<font color='green'>Synced</font>";
+
+                lastSyncStr = lastSyncStr.Replace("Synced", greenSynced);
+            }
 
             var gameStatus = "No Game Monitoring";
             if (!string.IsNullOrWhiteSpace(_gameProcessName))
