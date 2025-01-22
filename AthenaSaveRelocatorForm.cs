@@ -5,8 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using System.Diagnostics;
-using System.Reflection;  // For Assembly and reflection methods
+using System.Diagnostics;  // Added for Process support
 
 namespace AthenaSaveRelocator
 {
@@ -60,9 +59,6 @@ namespace AthenaSaveRelocator
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
 
-            // Load icon from Athena/Resources folder for the taskbar icon
-            Icon = LoadAppIcon();
-
             // 1. Load config from pathFile.txt
             LoadConfiguration();
 
@@ -83,20 +79,6 @@ namespace AthenaSaveRelocator
 
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
-        }
-
-        private Icon LoadAppIcon()
-        {
-            string iconPath = Path.Combine(Application.ExecutablePath, "resources", "app.ico");
-            if (File.Exists(iconPath))
-            {
-                return new Icon(iconPath);
-            }
-            else
-            {
-                Logger.Log($"App Icon not found at: {iconPath}");
-                return new Icon(SystemIcons.Information, 40, 40);
-            }
         }
 
         private void LoadConfiguration()
@@ -163,28 +145,28 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
             _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
-            // Load the icon for tray from Athena/Resources
-            Icon trayIconImage = LoadAppIcon();
+            //init the icon with the system information icon
+            Icon icon = new Icon(SystemIcons.Information, 40, 40);
 
             _trayIcon = new NotifyIcon
             {
                 Text = BuildTrayTooltip(),
-                Icon = trayIconImage,
+                Icon = icon,
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
 
-            // Hook the balloon tip click event
+            // *** FIX: Hook the balloon tip click event ***
             _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
         }
-
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
         {
             UpdateChecker.CheckForUpdates();
         }
+
 
         private void InitializePollingTimer()
         {
@@ -199,6 +181,7 @@ namespace AthenaSaveRelocator
             _updateCheckTimer.Tick += (s, e) => UpdateChecker.CheckForUpdates();
             _updateCheckTimer.Start();
         }
+
 
         private void CheckCloudNewerAtStartup()
         {
@@ -260,6 +243,8 @@ namespace AthenaSaveRelocator
 
         private void OnGameProcessExited(object sender, EventArgs e)
         {
+
+
             if (_gameProcess != null)
             {
                 _gameProcess.Exited -= OnGameProcessExited;
@@ -484,17 +469,18 @@ namespace AthenaSaveRelocator
 
         private string BuildTrayTooltip()
         {
-            string lastSyncStr = (_lastSyncTime == DateTime.MinValue)
+            var lastSyncStr = (_lastSyncTime == DateTime.MinValue)
                 ? "No sync yet"
-                : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
+                : "Synced" + _lastSyncTime.ToString("yyyy-MM-dd HH:mm");
 
-            // Prepend a green circle emoji if synced
             if (_lastSyncTime != DateTime.MinValue)
             {
-                lastSyncStr = lastSyncStr.Replace("Synced", "🟢 Synced");
+                var greenSynced = "<font color='green'>Synced</font>";
+
+                lastSyncStr = lastSyncStr.Replace("Synced", greenSynced);
             }
 
-            string gameStatus = "No Game Monitoring";
+            var gameStatus = "No Game Monitoring";
             if (!string.IsNullOrWhiteSpace(_gameProcessName))
             {
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
@@ -503,6 +489,7 @@ namespace AthenaSaveRelocator
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
 
+        //update build tray tooltip
         private void UpdateTrayTooltip()
         {
             _trayIcon.Text = BuildTrayTooltip();
