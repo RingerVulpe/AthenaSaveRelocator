@@ -229,6 +229,9 @@ namespace AthenaSaveRelocator
                 _preGameModTimes = TakeSaveFileSnapshot(_localPath);
                 _wasGameRunning = true;
                 Logger.Log($"Detected '{_gameProcessName}.exe' started. Capturing local save timestamps.");
+
+                // Update tray tooltip
+                UpdateTrayTooltip();
             }
         }
 
@@ -395,6 +398,9 @@ namespace AthenaSaveRelocator
                             "Success",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
+
+            // Update tray tooltip
+            UpdateTrayTooltip();
         }
 
         private void DoDownloadAndRestore()
@@ -421,6 +427,9 @@ namespace AthenaSaveRelocator
                             "Success",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
+
+            // Update tray tooltip
+            UpdateTrayTooltip();
         }
 
         #endregion
@@ -461,6 +470,12 @@ namespace AthenaSaveRelocator
             }
 
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
+        }
+
+        //update build tray tooltip
+        private void UpdateTrayTooltip()
+        {
+            _trayIcon.Text = BuildTrayTooltip();
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
