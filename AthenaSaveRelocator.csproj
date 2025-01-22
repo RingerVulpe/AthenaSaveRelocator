@@ -8,4 +8,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove=".gitattributes" />
+    <None Remove=".gitignore" />
+    <None Remove="Octokit.dll" />
+    <None Remove="Packager.deps.json" />
+    <None Remove="Packager.dll" />
+    <None Remove="Packager.exe" />
+    <None Remove="packager.log" />
+    <None Remove="Packager.pdb" />
+    <None Remove="Packager.runtimeconfig.json" />
+  </ItemGroup>
+
 </Project>

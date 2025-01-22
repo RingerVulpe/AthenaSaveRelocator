@@ -264,8 +264,6 @@ namespace AthenaSaveRelocator
 
         private void OnGameProcessExited(object sender, EventArgs e)
         {
-
-
             if (_gameProcess != null)
             {
                 _gameProcess.Exited -= OnGameProcessExited;
@@ -490,12 +488,12 @@ namespace AthenaSaveRelocator
 
         private string BuildTrayTooltip()
         {
-            string lastSyncStr = (_lastSyncTime == DateTime.MinValue)
+            string lastSyncStr = (AreSavesSynced())
                 ? "No sync yet"
                 : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
 
             // Prepend a green circle emoji if synced
-            if (_lastSyncTime != DateTime.MinValue)
+            if (AreSavesSynced())
             {
                 lastSyncStr = lastSyncStr.Replace("Synced", "🟢 Synced");
             }
@@ -507,6 +505,30 @@ namespace AthenaSaveRelocator
             }
 
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
+        }
+
+        //compare the local and cloud save files return bool to see if they are synced or not 
+        private bool AreSavesSynced()
+        {
+            var localFiles = Directory.GetFiles(_localPath, "*.save");
+            var cloudFiles = Directory.GetFiles(_cloudPath, "*.save");
+            if (localFiles.Length != cloudFiles.Length)
+            {
+                return false;
+            }
+            foreach (var localFile in localFiles)
+            {
+                string cloudFile = Path.Combine(_cloudPath, Path.GetFileName(localFile));
+                if (!File.Exists(cloudFile))
+                {
+                    return false;
+                }
+                if (File.GetLastWriteTime(localFile) != File.GetLastWriteTime(cloudFile))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
 
