@@ -87,7 +87,8 @@ namespace AthenaSaveRelocator
 
         private Icon LoadAppIcon()
         {
-            string iconPath = Path.Combine("resources", "app.ico");
+            //icon path is resources folder in the same directory as the executable
+            string iconPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "resources", "AthenaSaveRelocator.app.ico");
             if (File.Exists(iconPath))
             {
                 return new Icon(iconPath);
