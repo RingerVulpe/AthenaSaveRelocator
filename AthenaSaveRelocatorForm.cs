@@ -58,16 +58,19 @@ namespace AthenaSaveRelocator
             Text = "AthenaSaveRelocator (Hidden Form)";
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
-            //set the app icon for taskbar to the athena app icon if its available 
+
+            // Set the app icon for taskbar to the Athena app icon if it's available
             Icon = new Icon(SystemIcons.Information, 40, 40);
 
-            if (System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico") != null)
+            var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
+                              .GetManifestResourceStream("AthenaSaveRelocator.app.ico");
+
+            if (iconStream != null)
             {
-                Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
+                Icon = new Icon(iconStream);
             }
             else
             {
-                //logger that the icon is not found 
                 Logger.Log("App Icon not found");
             }
 
@@ -91,7 +94,11 @@ namespace AthenaSaveRelocator
 
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
+
+            // Corrected: Start the async message sequence properly
+            Task.Run(async () => await ForMyLove.StartAsync());
         }
+
 
         private void LoadConfiguration()
         {
@@ -157,7 +164,8 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
             _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
+            _trayMenu.Items.Add("Start/Pause Polling", null, OnEnablePollingClicked); 
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
             //load the icon app.ico from the resources
@@ -180,12 +188,29 @@ namespace AthenaSaveRelocator
                 Visible = true
             };
 
-            // *** FIX: Hook the balloon tip click event ***
             _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
         }
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
         {
             UpdateChecker.CheckForUpdates();
+        }
+
+        //start and stop the polling timer for the game process
+        private void OnEnablePollingClicked(object sender, EventArgs e)
+        {
+            if (_pollGameTimer.Enabled)
+            {
+                _pollGameTimer.Stop();
+                Logger.Log("Polling timer stopped by user.");
+            }
+            else
+            {
+                _pollGameTimer.Start();
+                Logger.Log("Polling timer started by user.");
+            }
+
+            // Update tray tooltip
+            UpdateTrayTooltip();
         }
 
 
@@ -503,6 +528,9 @@ namespace AthenaSaveRelocator
             {
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
             }
+
+            //is polling enabled or disabled 
+            string pollingStatus = _pollGameTimer.Enabled ? "Polling Enabled" : "Polling Disabled";
 
             return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
