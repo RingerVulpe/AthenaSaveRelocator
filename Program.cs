@@ -29,6 +29,7 @@ namespace AthenaSaveRelocator
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
+
                 Application.Run(new AthenaSaveRelocatorForm(true));
 
 

@@ -116,6 +116,9 @@ namespace AthenaSaveRelocator
             string extractPath = Path.Combine(Path.GetTempPath(), "AthenaUpdate");
             string currentExePath = Application.ExecutablePath;
             string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+            string exeName = Path.GetFileName(currentExePath);
+            string parentDir = Directory.GetParent(appDirectory)?.FullName
+                               ?? throw new Exception("Unable to determine parent directory.");
 
             try
             {
@@ -166,28 +169,25 @@ namespace AthenaSaveRelocator
                     // Use the first directory found as the new folder
                     string newFolderPath = newDirectories[0];
                     string newFolderName = Path.GetFileName(newFolderPath);
-                    string parentDir = Directory.GetParent(appDirectory)?.FullName
-                                       ?? throw new Exception("Unable to determine parent directory.");
-                    string exeName = Path.GetFileName(currentExePath);
 
-                    // Create an updater script to move the new folder, remove the old one, and start the new exe
+                    // Create an updater script to move the new folder, remove the old one, and start the new exe with --updated
                     scriptContent = $@"
 @echo off
 timeout /t 3 /nobreak >nul
 move ""{Path.Combine(extractPath, newFolderName)}"" ""{Path.Combine(parentDir, newFolderName)}""
 rmdir /S /Q ""{appDirectory}""
-start """" ""{Path.Combine(parentDir, newFolderName, exeName)}""
+start """" ""{Path.Combine(parentDir, newFolderName, exeName)}"" --updated
 exit
 ";
                 }
                 else
                 {
-                    // Fallback: If no new folder found, copy files into the current directory
+                    // Fallback: If no new folder found, copy files into the current directory and start with --updated
                     scriptContent = $@"
 @echo off
 timeout /t 3 /nobreak >nul
 xcopy /Y /E /C /I ""{extractPath}"" ""{appDirectory}""
-start """" ""{currentExePath}""
+start """" ""{currentExePath}"" --updated
 exit
 ";
                 }
