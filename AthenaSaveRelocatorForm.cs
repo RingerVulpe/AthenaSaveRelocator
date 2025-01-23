@@ -146,27 +146,105 @@ namespace AthenaSaveRelocator
             Logger.Log($"Configuration loaded. LocalPath={_localPath}, CloudPath={_cloudPath}, GameProcessName={_gameProcessName}");
         }
 
+
         private void InitializeTray()
         {
             _trayMenu = new ContextMenuStrip();
-            _trayMenu.Items.Add("Upload Save", null, OnBackupAndUploadClicked);
-            _trayMenu.Items.Add("Download Save", null, OnDownloadAndRestoreClicked);
-            _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
-            _trayMenu.Items.Add("Enable/Disable Game Monitoring", null, OnChangeWatchStatus); 
-            _trayMenu.Items.Add("Run for My Love", null, RunForMyLove);
-            _trayMenu.Items.Add("Clear Logs", null, Logger.ClearLog);
-            _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
+            // Upload and Download Section
+            var uploadItem = new ToolStripMenuItem("Upload Save")
+            {
+                Image = SystemIcons.Information.ToBitmap(), // Represents upload
+                Name = "uploadSaveToolStripMenuItem"
+            };
+            uploadItem.Click += OnBackupAndUploadClicked;
+
+            var downloadItem = new ToolStripMenuItem("Download Save")
+            {
+                Image = SystemIcons.Application.ToBitmap(), // Represents download
+                Name = "downloadSaveToolStripMenuItem"
+            };
+            downloadItem.Click += OnDownloadAndRestoreClicked;
+
+            _trayMenu.Items.Add(uploadItem);
+            _trayMenu.Items.Add(downloadItem);
+
+            _trayMenu.Items.Add(new ToolStripSeparator());
+
+            // Logs Section
+            var viewLogsItem = new ToolStripMenuItem("View Logs")
+            {
+                Image = SystemIcons.WinLogo.ToBitmap(), // Represents logs
+                Name = "viewLogsToolStripMenuItem"
+            };
+            viewLogsItem.Click += OnViewLogsClicked;
+
+            var clearLogsItem = new ToolStripMenuItem("Clear Logs")
+            {
+                Image = SystemIcons.Warning.ToBitmap(), // Represents clearing logs
+                Name = "clearLogsToolStripMenuItem"
+            };
+            clearLogsItem.Click += Logger.ClearLog;
+
+            _trayMenu.Items.Add(viewLogsItem);
+            _trayMenu.Items.Add(clearLogsItem);
+
+            _trayMenu.Items.Add(new ToolStripSeparator());
+
+            // Updates Section
+            var checkUpdatesItem = new ToolStripMenuItem("Check for Updates")
+            {
+                Image = SystemIcons.Question.ToBitmap(), // Represents updates
+                Name = "checkUpdatesToolStripMenuItem"
+            };
+            checkUpdatesItem.Click += OnCheckForUpdatesClicked;
+
+            _trayMenu.Items.Add(checkUpdatesItem);
+
+            _trayMenu.Items.Add(new ToolStripSeparator());
+
+            // Monitoring Section
+            var monitoringItem = new ToolStripMenuItem("Enable Game Monitoring")
+            {
+                Image = SystemIcons.Shield.ToBitmap(), // Represents monitoring
+                Name = "monitoringToolStripMenuItem"
+            };
+            monitoringItem.Click += OnChangeWatchStatus;
+
+            _trayMenu.Items.Add(monitoringItem);
+
+            // Additional Actions
+            var runLoveItem = new ToolStripMenuItem("Run for My Love")
+            {
+                Image = SystemIcons.Asterisk.ToBitmap(), // Represents a special action
+                Name = "runLoveToolStripMenuItem"
+            };
+            runLoveItem.Click += RunForMyLove;
+
+            _trayMenu.Items.Add(runLoveItem);
+
+            _trayMenu.Items.Add(new ToolStripSeparator());
+
+            // Quit Application
+            var quitItem = new ToolStripMenuItem("Quit App")
+            {
+                Image = SystemIcons.Error.ToBitmap(), // Represents quit
+                Name = "quitAppToolStripMenuItem"
+            };
+            quitItem.Click += OnQuitClicked;
+
+            _trayMenu.Items.Add(quitItem);
+
+            // Initialize Tray Icon
             _trayIcon = new NotifyIcon
             {
                 Text = BuildTrayTooltip(),
-                Icon = SystemIcons.Information,
+                Icon = SystemIcons.Application, // Use a relevant system icon
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
 
-            // *** FIX: Hook the balloon tip click event ***
+            // Hook the balloon tip click event
             _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
         }
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
@@ -179,40 +257,28 @@ namespace AthenaSaveRelocator
             ForMyLove.RunProgram(); 
         }
 
-        //enable or disable game monitoring
         private void OnChangeWatchStatus(object sender, EventArgs e)
         {
-            if (_gameProcessName == string.Empty)
-            {
-                MessageBox.Show("No game process name found in pathFile.txt. Game monitoring is disabled.",
-                                "Game Monitoring Disabled",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-                Logger.Log("No game process name found in pathFile.txt. Game monitoring is disabled.");
-                return;
-            }
-            if (_pollGameTimer.Enabled)
-            {
-                _pollGameTimer.Enabled = false;
-                Logger.Log("Game monitoring disabled.");
-                MessageBox.Show("Game monitoring disabled.",
-                                "Game Monitoring Disabled",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-            }
-            else
-            {
-                _pollGameTimer.Enabled = true;
-                Logger.Log("Game monitoring enabled.");
-                MessageBox.Show("Game monitoring enabled.",
-                                "Game Monitoring Enabled",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-            }
+            // Toggle the monitoring status
+            bool isEnabled = ToggleMonitoring();
 
-            //update the tray 
-            UpdateTrayTooltip();
+            // Update the menu item
+            if (sender is ToolStripMenuItem monitoringItem)
+            {
+                monitoringItem.Text = isEnabled ? "Disable Game Monitoring" : "Enable Game Monitoring";
+                monitoringItem.Image = isEnabled ? SystemIcons.Shield.ToBitmap() : SystemIcons.Shield.ToBitmap(); // Optionally use different icons
+            }
         }
+
+        //toggle the monitoring status
+        private bool ToggleMonitoring()
+        {
+            bool isEnabled = !_pollGameTimer.Enabled;
+            _pollGameTimer.Enabled = isEnabled;
+            Logger.Log($"Game monitoring {(isEnabled ? "enabled" : "disabled")}.");
+            return isEnabled;
+        }
+
 
         private void InitializePollingTimer()
         {
