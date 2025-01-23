@@ -5,9 +5,11 @@ namespace AthenaSaveRelocator
 {
     internal static class Program
     {
+
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+
             // Prevent multiple instances of the application
             if (System.Diagnostics.Process.GetProcessesByName(System.Diagnostics.Process.GetCurrentProcess().ProcessName).Length > 1)
             {
@@ -17,7 +19,25 @@ namespace AthenaSaveRelocator
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new AthenaSaveRelocatorForm());
+
+            // Check if the application was started with the --updated argument
+            if (args.Contains("--updated"))
+            {
+                MessageBox.Show(
+                    "The application has been successfully updated to the latest version.",
+                    "Update Successful",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                Application.Run(new AthenaSaveRelocatorForm(true));
+
+
+            }
+            else
+            {
+                Application.Run(new AthenaSaveRelocatorForm(false));
+            }
+
         }
     }
 }

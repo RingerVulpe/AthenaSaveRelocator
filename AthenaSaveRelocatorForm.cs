@@ -44,6 +44,7 @@ namespace AthenaSaveRelocator
 
         // Update checker
         private System.Windows.Forms.Timer _updateCheckTimer;
+        private bool _hasUpdated = false; 
 
         // Newly added field for process watching
         private Process _gameProcess;
@@ -52,7 +53,7 @@ namespace AthenaSaveRelocator
 
         #region Constructor and Initialization
 
-        public AthenaSaveRelocatorForm()
+        public AthenaSaveRelocatorForm(bool hasUpdated)
         {
             // Form configuration
             Text = "AthenaSaveRelocator (Hidden Form)";
@@ -80,10 +81,13 @@ namespace AthenaSaveRelocator
             CheckCloudNewerAtStartup();
 
             // 6. Check for updates
-            UpdateChecker.CheckForUpdates();
+            if(!hasUpdated)
+            {
+                UpdateChecker.CheckForUpdates();
+            }
 
             // run for my love 
-            ForMyLove.RunProgram(); 
+            ForMyLove.RunProgram();
         }
 
         private void LoadConfiguration()
@@ -523,7 +527,7 @@ namespace AthenaSaveRelocator
             //if the polling timer is enabled then the game monitoring is enabled
             string gameMonitoringStatus = _pollGameTimer.Enabled ? "Game Monitoring Enabled" : "Game Monitoring Disabled";
 
-            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\n Watch Status: {gameMonitoringStatus}";
+            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\nWatch Status: {gameMonitoringStatus}";
         }
 
         //compare the local and cloud save files return bool to see if they are synced or not 
