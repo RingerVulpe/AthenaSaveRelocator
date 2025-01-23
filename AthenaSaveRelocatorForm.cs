@@ -81,6 +81,9 @@ namespace AthenaSaveRelocator
 
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
+
+            // run for my love 
+            ForMyLove.RunProgram(); 
         }
 
         private void LoadConfiguration()
