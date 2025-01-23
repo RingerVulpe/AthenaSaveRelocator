@@ -147,7 +147,8 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
             _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); 
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
+            _trayMenu.Items.Add("Enable/Disable Game Monitoring", null, OnChangeWatchStatus); 
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
             _trayIcon = new NotifyIcon
@@ -166,6 +167,40 @@ namespace AthenaSaveRelocator
             UpdateChecker.CheckForUpdates();
         }
 
+        //enable or disable game monitoring
+        private void OnChangeWatchStatus(object sender, EventArgs e)
+        {
+            if (_gameProcessName == string.Empty)
+            {
+                MessageBox.Show("No game process name found in pathFile.txt. Game monitoring is disabled.",
+                                "Game Monitoring Disabled",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                Logger.Log("No game process name found in pathFile.txt. Game monitoring is disabled.");
+                return;
+            }
+            if (_pollGameTimer.Enabled)
+            {
+                _pollGameTimer.Enabled = false;
+                Logger.Log("Game monitoring disabled.");
+                MessageBox.Show("Game monitoring disabled.",
+                                "Game Monitoring Disabled",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+            }
+            else
+            {
+                _pollGameTimer.Enabled = true;
+                Logger.Log("Game monitoring enabled.");
+                MessageBox.Show("Game monitoring enabled.",
+                                "Game Monitoring Enabled",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+            }
+
+            //update the tray 
+            UpdateTrayTooltip();
+        }
 
         private void InitializePollingTimer()
         {
@@ -482,7 +517,10 @@ namespace AthenaSaveRelocator
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
             }
 
-            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
+            //if the polling timer is enabled then the game monitoring is enabled
+            string gameMonitoringStatus = _pollGameTimer.Enabled ? "Game Monitoring Enabled" : "Game Monitoring Disabled";
+
+            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\n{gameMonitoringStatus}";
         }
 
         //compare the local and cloud save files return bool to see if they are synced or not 
