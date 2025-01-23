@@ -8,7 +8,8 @@ namespace AthenaSaveRelocator
     {
         public static async Task StartAsync()
         {
-            await Task.Delay(1000); // Short delay for a smooth launch experience
+            // Short delay for a smooth launch experience
+            await Task.Delay(1000);
 
             ShowMessageSequence();
         }

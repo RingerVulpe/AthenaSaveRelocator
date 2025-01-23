@@ -95,9 +95,10 @@ namespace AthenaSaveRelocator
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
 
-            // Corrected: Start the async message sequence properly
-            Task.Run(async () => await ForMyLove.StartAsync());
+            // Subscribe to the Shown event to start the message sequence
+            this.Shown += async (s, e) => await ForMyLove.StartAsync();
         }
+
 
 
         private void LoadConfiguration()
