@@ -38,5 +38,17 @@ namespace AthenaSaveRelocator
             }
             Debug.WriteLine(logMessage);
         }
+
+        //clear log file
+        public static void ClearLog(object sender, EventArgs e)
+        {
+            try
+            {
+                File.WriteAllText(_logFileName, string.Empty);
+            }
+            catch
+            {
+            }
+        }
     }
 }

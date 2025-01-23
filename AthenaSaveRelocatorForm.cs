@@ -155,6 +155,7 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
             _trayMenu.Items.Add("Enable/Disable Game Monitoring", null, OnChangeWatchStatus); 
             _trayMenu.Items.Add("Run for My Love", null, RunForMyLove);
+            _trayMenu.Items.Add("Clear Logs", null, Logger.ClearLog);
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
             _trayIcon = new NotifyIcon
