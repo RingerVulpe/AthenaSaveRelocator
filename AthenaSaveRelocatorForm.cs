@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using System.Diagnostics;
+using System.Diagnostics;  // Added for Process support
 
 namespace AthenaSaveRelocator
 {
@@ -13,29 +13,36 @@ namespace AthenaSaveRelocator
     {
         #region Fields
 
+        // Tray and menu
         private NotifyIcon _trayIcon;
         private ContextMenuStrip _trayMenu;
         private System.Windows.Forms.Timer _pollGameTimer;
 
+        // Paths and game info
         private string _localPath;
         private string _cloudPath;
         private string _gameProcessName;
 
+        // State tracking
         private bool _wasGameRunning = false;
         private Dictionary<string, DateTime> _preGameModTimes = new Dictionary<string, DateTime>();
         private DateTime _lastSyncTime = DateTime.MinValue;
 
+        // For balloon tips
         private enum BalloonMode { None, CloudNewerAtStartup, LocalChangedAfterGame }
         private BalloonMode _currentBalloonMode = BalloonMode.None;
 
+        // Constants
         private const int MaxBackups = 5;
         private const string LogFileName = "log.txt";
 
+        // Dedicated helper objects
         private BackupManager _backupManager;
         private GameWatcher _gameWatcher;
         private CloudChecker _cloudChecker;
         private BalloonNotifier _balloonNotifier;
 
+        // Update checker
         private System.Windows.Forms.Timer _updateCheckTimer;
 
         // Newly added field for process watching
@@ -43,269 +50,191 @@ namespace AthenaSaveRelocator
 
         #endregion
 
-        #region Constructor
+        #region Constructor and Initialization
 
         public AthenaSaveRelocatorForm()
         {
-            // Log entry into constructor
-            Logger.Log("INFO: Entering AthenaSaveRelocatorForm constructor.");
+            // Form configuration
+            Text = "AthenaSaveRelocator (Hidden Form)";
+            ShowInTaskbar = false;
+            WindowState = FormWindowState.Minimized;
+            //set the app icon for taskbar to the athena app icon if its available 
+            Icon = new Icon(SystemIcons.Information, 40, 40);
 
-            try
+            if (System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico") != null)
             {
-                // Basic form setup
-                Text = "AthenaSaveRelocator (Hidden Form)";
-                ShowInTaskbar = false;
-                WindowState = FormWindowState.Minimized;
-
-                // Attempt to set a safe icon
-                try
-                {
-                    Icon = new Icon(SystemIcons.Information, 40, 40);
-                }
-                catch (Exception exIcon)
-                {
-                    Logger.Log($"WARN: Could not set custom Icon. Falling back to default. Exception: {exIcon.Message}");
-                    // Even if icon fails, it's non-fatal. We do nothing special here.
-                }
-
-                // Step 1. Load configuration from pathFile.txt
-                LoadConfiguration();
-
-                // Step 2. Initialize helper objects
-                _backupManager = new BackupManager(LogFileName, MaxBackups);
-                _gameWatcher = new GameWatcher(_gameProcessName);
-                _cloudChecker = new CloudChecker(_backupManager);
-                _balloonNotifier = new BalloonNotifier();
-
-                // Step 3. Initialize tray UI
-                InitializeTray();
-
-                // Step 4. Initialize polling timer for game detection
-                InitializePollingTimer();
-
-                // Step 5. Check whether cloud is newer right after startup
-                CheckCloudNewerAtStartup();
-
-                // Step 6. Check for updates
-                try
-                {
-                    _ = UpdateChecker.CheckForUpdates();
-                }
-                catch (Exception updateEx)
-                {
-                    Logger.Log($"ERROR: UpdateChecker failed: {updateEx.Message}");
-                }
-
-                Logger.Log("INFO: AthenaSaveRelocatorForm constructor completed successfully.");
+                Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
             }
-            catch (Exception ex)
+            else
             {
-                // Log any unhandled exception in constructor
-                Logger.Log($"FATAL: Unhandled exception in constructor: {ex.Message}");
-                MessageBox.Show(
-                    $"Unhandled error initializing. The program will now exit.\n\n{ex.Message}",
-                    "Startup Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-                Environment.Exit(1); // Hard exit because the form cannot proceed safely
+                //logger that the icon is not found 
+                Logger.Log("App Icon not found");
             }
+
+            // 1. Load config from pathFile.txt
+            LoadConfiguration();
+
+            // 2. Initialize dedicated helper objects
+            _backupManager = new BackupManager(LogFileName, MaxBackups);
+            _gameWatcher = new GameWatcher(_gameProcessName);
+            _cloudChecker = new CloudChecker(_backupManager);
+            _balloonNotifier = new BalloonNotifier();
+
+            // 3. Initialize tray UI
+            InitializeTray();
+
+            // 4. Initialize polling timer for game detection
+            InitializePollingTimer();
+
+            // 5. Check whether cloud is newer right after startup
+            CheckCloudNewerAtStartup();
+
+            // 6. Check for updates
+            UpdateChecker.CheckForUpdates();
         }
-
-        #endregion
-
-        #region Configuration
 
         private void LoadConfiguration()
         {
-            Logger.Log("INFO: Attempting to load configuration from pathFile.txt.");
-
-            try
+            if (!File.Exists("pathFile.txt"))
             {
-                if (!File.Exists("pathFile.txt"))
-                {
-                    Logger.Log("ERROR: pathFile.txt not found. Exiting.");
-                    MessageBox.Show(
-                        "pathFile.txt not found. Application will exit.",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    Environment.Exit(1);
-                }
-
-                var lines = File.ReadAllLines("pathFile.txt");
-                if (lines.Length < 2)
-                {
-                    Logger.Log("ERROR: pathFile.txt missing local/cloud paths. Exiting.");
-                    MessageBox.Show(
-                        "pathFile.txt must contain at least two lines (local and cloud paths).",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    Environment.Exit(1);
-                }
-
-                _localPath = lines[0].Trim();
-                _cloudPath = lines[1].Trim();
-                _gameProcessName = lines.Length >= 3 ? lines[2].Trim() : string.Empty;
-
-                // Validate directories
-                if (!Directory.Exists(_localPath))
-                {
-                    Logger.Log($"ERROR: Local path '{_localPath}' does not exist. Exiting.");
-                    MessageBox.Show(
-                        $"Local path does not exist: {_localPath}",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    Environment.Exit(1);
-                }
-                if (!Directory.Exists(_cloudPath))
-                {
-                    Logger.Log($"ERROR: Cloud path '{_cloudPath}' does not exist. Exiting.");
-                    MessageBox.Show(
-                        $"Cloud path does not exist: {_cloudPath}",
-                        "Configuration Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    Environment.Exit(1);
-                }
-
-                // Check for process name
-                if (string.IsNullOrWhiteSpace(_gameProcessName))
-                {
-                    Logger.Log("INFO: No game process name found in pathFile.txt line 3. Will not detect game running status.");
-                }
-                else
-                {
-                    Logger.Log($"INFO: Watching for game process: '{_gameProcessName}.exe'");
-                }
-
-                // Debug: Summarize loaded config
-                Logger.Log($"INFO: Configuration loaded. LocalPath={_localPath}, CloudPath={_cloudPath}, GameProcessName={_gameProcessName}");
-            }
-            catch (Exception ex)
-            {
-                // Catch all other exceptions
-                Logger.Log($"FATAL: Exception in LoadConfiguration: {ex.Message}");
-                MessageBox.Show(
-                    $"Error reading pathFile.txt: {ex.Message}\n\nApplication will exit.",
-                    "Configuration Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
+                MessageBox.Show("pathFile.txt not found. Application will exit.",
+                                "Configuration Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                Logger.Log("ERROR: pathFile.txt not found. Exiting.");
                 Environment.Exit(1);
             }
+
+            var lines = File.ReadAllLines("pathFile.txt");
+            if (lines.Length < 2)
+            {
+                MessageBox.Show("pathFile.txt must contain at least two lines (local and cloud paths).",
+                                "Configuration Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                Logger.Log("ERROR: pathFile.txt missing local/cloud paths. Exiting.");
+                Environment.Exit(1);
+            }
+
+            _localPath = lines[0].Trim();
+            _cloudPath = lines[1].Trim();
+            _gameProcessName = lines.Length >= 3 ? lines[2].Trim() : string.Empty;
+
+            if (!Directory.Exists(_localPath))
+            {
+                MessageBox.Show($"Local path does not exist: {_localPath}",
+                                "Configuration Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                Logger.Log($"ERROR: Local path '{_localPath}' does not exist. Exiting.");
+                Environment.Exit(1);
+            }
+            if (!Directory.Exists(_cloudPath))
+            {
+                MessageBox.Show($"Cloud path does not exist: {_cloudPath}",
+                                "Configuration Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                Logger.Log($"ERROR: Cloud path '{_cloudPath}' does not exist. Exiting.");
+                Environment.Exit(1);
+            }
+
+            if (string.IsNullOrWhiteSpace(_gameProcessName))
+            {
+                Logger.Log("No game process name found in pathFile.txt line 3. Will not detect game running status.");
+            }
+            else
+            {
+                Logger.Log($"Watching for game process: '{_gameProcessName}.exe'");
+            }
+
+            Logger.Log($"Configuration loaded. LocalPath={_localPath}, CloudPath={_cloudPath}, GameProcessName={_gameProcessName}");
         }
-
-        #endregion
-
-        #region Tray Initialization
 
         private void InitializeTray()
         {
-            Logger.Log("INFO: Initializing tray menu and tray icon.");
+            _trayMenu = new ContextMenuStrip();
+            _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
+            _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
+            _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
+            _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked); // NEW MENU ITEM
+            _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
-            try
+            //load the icon app.ico from the resources
+            Stream iconStream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico");
+
+            //init the icon with the system information icon
+            Icon icon = new Icon(SystemIcons.Information, 40, 40);
+
+            if (iconStream != null)
             {
-                _trayMenu = new ContextMenuStrip();
-                _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
-                _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
-                _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
-                _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
-                _trayMenu.Items.Add("Start/Pause Polling", null, OnEnablePollingClicked);
-                _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
-
-                _trayIcon = new NotifyIcon
-                {
-                    Text = BuildTrayTooltip(),
-                    Icon = new Icon(SystemIcons.Information, 40, 40),
-                    ContextMenuStrip = _trayMenu,
-                    Visible = true
-                };
-
-                _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
+                icon = new Icon(iconStream);
             }
-            catch (Exception ex)
+
+
+            _trayIcon = new NotifyIcon
             {
-                Logger.Log($"ERROR: Exception initializing tray: {ex.Message}");
-                MessageBox.Show(
-                    $"Error initializing tray icon or menu:\n{ex.Message}",
-                    "Tray Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
+                Text = BuildTrayTooltip(),
+                Icon = icon,
+                ContextMenuStrip = _trayMenu,
+                Visible = true
+            };
+
+            // *** FIX: Hook the balloon tip click event ***
+            _trayIcon.BalloonTipClicked += OnBalloonTipClicked;
+        }
+        private void OnCheckForUpdatesClicked(object sender, EventArgs e)
+        {
+            UpdateChecker.CheckForUpdates();
+        }
+
+
+        private void InitializePollingTimer()
+        {
+            _pollGameTimer = new System.Windows.Forms.Timer();
+            _pollGameTimer.Interval = 5000; // Poll every 5 seconds
+            _pollGameTimer.Tick += (s, e) => PollForGameProcess();
+            _pollGameTimer.Start();
+
+            // Auto-update check every 24 hours
+            _updateCheckTimer = new System.Windows.Forms.Timer();
+            _updateCheckTimer.Interval = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            _updateCheckTimer.Tick += (s, e) => UpdateChecker.CheckForUpdates();
+            _updateCheckTimer.Start();
+        }
+
+
+        private void CheckCloudNewerAtStartup()
+        {
+            // Re-use the "GetChangedSaveFiles" approach from BackupManager
+            var changedFiles = _backupManager.GetChangedSaveFiles(_cloudPath, _localPath);
+            if (changedFiles.Any())
+            {
+                Logger.Log("Cloud is newer than local for at least one save. Notifying user at startup.");
+                _currentBalloonMode = BalloonMode.CloudNewerAtStartup;
+
+                // Show a balloon tip for 6 seconds
+                _balloonNotifier.ShowNotification(
+                    _trayIcon,
+                    "AthenaSaveRelocator",
+                    "We found newer cloud saves. Click here to restore them.",
+                    6000
                 );
             }
         }
 
         #endregion
 
-        #region Polling / Timers
-
-        private void InitializePollingTimer()
-        {
-            Logger.Log("INFO: Initializing polling timer for game process and update checker.");
-
-            try
-            {
-                _pollGameTimer = new System.Windows.Forms.Timer
-                {
-                    Interval = 5000 // Poll every 5 seconds
-                };
-                _pollGameTimer.Tick += (s, e) =>
-                {
-                    try
-                    {
-                        PollForGameProcess();
-                    }
-                    catch (Exception exTimer)
-                    {
-                        Logger.Log($"ERROR: Exception in PollForGameProcess: {exTimer.Message}");
-                    }
-                };
-                _pollGameTimer.Start();
-
-                _updateCheckTimer = new System.Windows.Forms.Timer
-                {
-                    Interval = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
-                };
-                _updateCheckTimer.Tick += (s, e) =>
-                {
-                    try
-                    {
-                        UpdateChecker.CheckForUpdates();
-                    }
-                    catch (Exception exUpdate)
-                    {
-                        Logger.Log($"ERROR: Exception in update check timer: {exUpdate.Message}");
-                    }
-                };
-                _updateCheckTimer.Start();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception during InitializePollingTimer: {ex.Message}");
-                MessageBox.Show(
-                    $"Failed to set up timers. The application may be unstable.\n\n{ex.Message}",
-                    "Timer Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-            }
-        }
+        #region Polling for Game Process
 
         private void PollForGameProcess()
         {
+            // Only attempt to start watching if we aren't already monitoring a process
             if (!_wasGameRunning)
             {
-                Logger.Log("DEBUG: Game is not flagged as running; attempting to detect startup...");
                 StartWatchingGameProcess();
             }
-            // If the process is running, exit is handled by OnGameProcessExited
+            // Exiting is handled by the Exited event, so no further action is needed here.
         }
 
         private void StartWatchingGameProcess()
@@ -313,373 +242,228 @@ namespace AthenaSaveRelocator
             if (string.IsNullOrWhiteSpace(_gameProcessName))
             {
                 // No process to watch
-                Logger.Log("DEBUG: No _gameProcessName was set; skipping process watch attempt.");
                 return;
             }
 
-            try
+            Process process = _gameWatcher.GetGameProcess();
+            if (process != null)
             {
-                var process = _gameWatcher.GetGameProcess();
-                if (process != null)
-                {
-                    _gameProcess = process;
-                    _gameProcess.EnableRaisingEvents = true;
-                    _gameProcess.Exited += OnGameProcessExited;
+                _gameProcess = process;
+                _gameProcess.EnableRaisingEvents = true;
+                _gameProcess.Exited += OnGameProcessExited;
 
-                    // Record the current snapshot of local saves
-                    _preGameModTimes = TakeSaveFileSnapshot(_localPath);
-                    _wasGameRunning = true;
-                    Logger.Log($"INFO: Detected '{_gameProcessName}.exe' started. Capturing local save timestamps.");
+                // Record the current snapshot of local saves
+                _preGameModTimes = TakeSaveFileSnapshot(_localPath);
+                _wasGameRunning = true;
+                Logger.Log($"Detected '{_gameProcessName}.exe' started. Capturing local save timestamps.");
 
-                    UpdateTrayTooltip();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Failed to start watching game process: {ex.Message}");
+                // Update tray tooltip
+                UpdateTrayTooltip();
             }
         }
 
         private void OnGameProcessExited(object sender, EventArgs e)
         {
-            Logger.Log($"INFO: Detected '{_gameProcessName}.exe' has exited.");
-
-            try
+            if (_gameProcess != null)
             {
-                if (_gameProcess != null)
-                {
-                    _gameProcess.Exited -= OnGameProcessExited;
-                    _gameProcess.Dispose();
-                    _gameProcess = null;
-                }
-
-                _wasGameRunning = false;
-
-                var postGameModTimes = TakeSaveFileSnapshot(_localPath);
-                bool isAnyChanged = false;
-
-                // Compare each file for changes
-                foreach (var kvp in postGameModTimes)
-                {
-                    string file = kvp.Key;
-                    DateTime newTime = kvp.Value;
-
-                    if (!_preGameModTimes.ContainsKey(file) || newTime > _preGameModTimes[file])
-                    {
-                        isAnyChanged = true;
-                        break;
-                    }
-                }
-
-                if (isAnyChanged)
-                {
-                    Logger.Log("INFO: Local save files changed after game exit. Showing balloon notification.");
-                    _currentBalloonMode = BalloonMode.LocalChangedAfterGame;
-
-                    _balloonNotifier.ShowNotification(
-                        _trayIcon,
-                        "AthenaSaveRelocator",
-                        "Game closed - new local saves found. Click here to upload.",
-                        6000
-                    );
-                }
-                else
-                {
-                    Logger.Log("INFO: No local save changes detected after game exit.");
-                }
-
-                UpdateTrayTooltip();
+                _gameProcess.Exited -= OnGameProcessExited;
+                _gameProcess.Dispose();
+                _gameProcess = null;
             }
-            catch (Exception ex)
+
+            _wasGameRunning = false;
+            Logger.Log($"Detected '{_gameProcessName}.exe' exited. Checking for changed local saves...");
+
+            var postGameModTimes = TakeSaveFileSnapshot(_localPath);
+            bool anyChanged = false;
+            //update build tray tooltip
+            UpdateTrayTooltip();
+
+            // Compare each file
+            foreach (var kvp in postGameModTimes)
             {
-                Logger.Log($"ERROR: Exception in OnGameProcessExited: {ex.Message}");
+                string file = kvp.Key;
+                DateTime newTime = kvp.Value;
+
+                if (!_preGameModTimes.ContainsKey(file) || newTime > _preGameModTimes[file])
+                {
+                    anyChanged = true;
+                    break;
+                }
+            }
+
+            if (anyChanged)
+            {
+                Logger.Log("Detected updated local save files after game exit. Showing balloon notification.");
+                _currentBalloonMode = BalloonMode.LocalChangedAfterGame;
+
+                _balloonNotifier.ShowNotification(
+                    _trayIcon,
+                    "AthenaSaveRelocator",
+                    "Game closed - new local saves found. Click here to upload.",
+                    6000
+                );
+            }
+            else
+            {
+                Logger.Log("No local save changes detected after game exit.");
             }
         }
 
         #endregion
 
-        #region Balloon Checks at Startup
-
-        private void CheckCloudNewerAtStartup()
-        {
-            Logger.Log("INFO: Checking if cloud saves are newer than local at startup.");
-
-            try
-            {
-                var changedFiles = _backupManager.GetChangedSaveFiles(_cloudPath, _localPath);
-                if (changedFiles.Any())
-                {
-                    Logger.Log("INFO: Cloud is newer than local for at least one save. Notifying user at startup.");
-                    _currentBalloonMode = BalloonMode.CloudNewerAtStartup;
-
-                    _balloonNotifier.ShowNotification(
-                        _trayIcon,
-                        "AthenaSaveRelocator",
-                        "We found newer cloud saves. Click here to restore them.",
-                        6000
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in CheckCloudNewerAtStartup: {ex.Message}");
-            }
-        }
-
-        #endregion
-
-        #region Tray Event Handlers
+        #region Tray Menu Handlers
 
         private void OnBackupAndUploadClicked(object sender, EventArgs e)
         {
-            Logger.Log("INFO: User clicked 'Backup & Upload Save'.");
             DoBackupAndUpload();
         }
 
         private void OnDownloadAndRestoreClicked(object sender, EventArgs e)
         {
-            Logger.Log("INFO: User clicked 'Download & Restore Save'.");
             DoDownloadAndRestore();
         }
 
         private void OnViewLogsClicked(object sender, EventArgs e)
         {
-            Logger.Log("INFO: User clicked 'View Logs'. Attempting to open log file.");
             try
             {
-                Process.Start("notepad.exe", LogFileName);
+                System.Diagnostics.Process.Start("notepad.exe", LogFileName);
             }
             catch (Exception ex)
             {
-                Logger.Log($"ERROR: Error opening log file: {ex.Message}");
-                MessageBox.Show(
-                    $"Could not open log file. {ex.Message}",
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-        }
-
-        private void OnCheckForUpdatesClicked(object sender, EventArgs e)
-        {
-            Logger.Log("INFO: User clicked 'Check for Updates'.");
-            try
-            {
-                UpdateChecker.CheckForUpdates();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception checking for updates from menu: {ex.Message}");
-                MessageBox.Show(
-                    $"Check for Updates failed:\n{ex.Message}",
-                    "Update Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-        }
-
-        private void OnEnablePollingClicked(object sender, EventArgs e)
-        {
-            Logger.Log("INFO: User toggled polling timer.");
-
-            try
-            {
-                if (_pollGameTimer.Enabled)
-                {
-                    _pollGameTimer.Stop();
-                    Logger.Log("INFO: Polling timer stopped by user.");
-                }
-                else
-                {
-                    _pollGameTimer.Start();
-                    Logger.Log("INFO: Polling timer started by user.");
-                }
-
-                UpdateTrayTooltip();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception toggling polling timer: {ex.Message}");
+                Logger.Log($"Error opening log file: {ex.Message}");
+                MessageBox.Show($"Could not open log file. {ex.Message}",
+                                "Error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
             }
         }
 
         private void OnQuitClicked(object sender, EventArgs e)
         {
-            Logger.Log("INFO: User clicked 'Quit App'. Exiting application.");
             Application.Exit();
         }
 
         #endregion
 
-        #region BalloonTip Click Handler
+        #region Balloon Tip Click Handler
 
         private void OnBalloonTipClicked(object sender, EventArgs e)
         {
-            Logger.Log($"INFO: Balloon tip clicked with mode={_currentBalloonMode}.");
+            // Decide what to do based on _currentBalloonMode
+            switch (_currentBalloonMode)
+            {
+                case BalloonMode.CloudNewerAtStartup:
+                    // Offer to restore from cloud
+                    var resultCloud = MessageBox.Show(
+                        "We found newer cloud saves. Download (restore) them now?",
+                        "Download Confirmation",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question
+                    );
+                    if (resultCloud == DialogResult.Yes)
+                    {
+                        DoDownloadAndRestore();
+                    }
+                    else
+                    {
+                        Logger.Log("User dismissed 'cloud newer' prompt at startup.");
+                    }
+                    break;
 
-            try
-            {
-                switch (_currentBalloonMode)
-                {
-                    case BalloonMode.CloudNewerAtStartup:
-                        {
-                            var resultCloud = MessageBox.Show(
-                                "We found newer cloud saves. Download (restore) them now?",
-                                "Download Confirmation",
-                                MessageBoxButtons.YesNo,
-                                MessageBoxIcon.Question
-                            );
-                            if (resultCloud == DialogResult.Yes)
-                            {
-                                DoDownloadAndRestore();
-                            }
-                            else
-                            {
-                                Logger.Log("INFO: User dismissed 'cloud newer' prompt at startup.");
-                            }
-                            break;
-                        }
-                    case BalloonMode.LocalChangedAfterGame:
-                        {
-                            var resultLocal = MessageBox.Show(
-                                "We detected updated local saves after the game closed. Upload them now?",
-                                "Upload Confirmation",
-                                MessageBoxButtons.YesNo,
-                                MessageBoxIcon.Question
-                            );
-                            if (resultLocal == DialogResult.Yes)
-                            {
-                                DoBackupAndUpload();
-                            }
-                            else
-                            {
-                                Logger.Log("INFO: User dismissed 'local changed' upload prompt.");
-                            }
-                            break;
-                        }
-                    default:
-                        // No action
-                        Logger.Log("DEBUG: Balloon tip clicked but no special mode set.");
-                        break;
-                }
+                case BalloonMode.LocalChangedAfterGame:
+                    // Offer to upload local changes
+                    var resultLocal = MessageBox.Show(
+                        "We detected updated local saves after the game closed. Upload them now?",
+                        "Upload Confirmation",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question
+                    );
+                    if (resultLocal == DialogResult.Yes)
+                    {
+                        DoBackupAndUpload();
+                    }
+                    else
+                    {
+                        Logger.Log("User dismissed 'local changed' upload prompt.");
+                    }
+                    break;
+
+                default:
+                    // No action
+                    break;
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in OnBalloonTipClicked: {ex.Message}");
-            }
-            finally
-            {
-                _currentBalloonMode = BalloonMode.None;
-            }
+
+            // Reset balloon mode
+            _currentBalloonMode = BalloonMode.None;
         }
 
         #endregion
 
-        #region Core Backup/Restore
+        #region Backup and Transfer Helpers (delegating to BackupManager)
 
         private void DoBackupAndUpload()
         {
-            Logger.Log("INFO: Starting backup and upload procedure.");
-
             if (_wasGameRunning)
             {
-                Logger.Log("WARN: Attempted backup/upload while game is running; blocking.");
-                MessageBox.Show(
-                    "Game is currently running. Please close the game before transferring files.",
-                    "Game Running",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
+                MessageBox.Show("Game is currently running. Please close the game before transferring files.",
+                                "Game Running",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                Logger.Log("User tried to do Backup & Upload while game is running - blocked.");
                 return;
             }
 
-            try
-            {
-                // 1. Back up local
-                _backupManager.BackupSaves(_localPath);
+            // 1. Back up local
+            _backupManager.BackupSaves(_localPath);
 
-                // 2. Transfer local -> cloud
-                _backupManager.TransferFiles(_localPath, _cloudPath);
+            // 2. Transfer local -> cloud
+            _backupManager.TransferFiles(_localPath, _cloudPath);
 
-                _lastSyncTime = DateTime.Now;
-                Logger.Log("INFO: Backup & Upload completed successfully.");
-                MessageBox.Show(
-                    "Backup and upload to cloud complete.",
-                    "Success",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in DoBackupAndUpload: {ex.Message}");
-                MessageBox.Show(
-                    $"Failed to upload saves.\n{ex.Message}",
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-            finally
-            {
-                UpdateTrayTooltip();
-            }
+            _lastSyncTime = DateTime.Now;
+            Logger.Log("Manual/Auto Backup & Upload completed.");
+            MessageBox.Show("Backup and upload to cloud complete.",
+                            "Success",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+
+            // Update tray tooltip
+            UpdateTrayTooltip();
         }
 
         private void DoDownloadAndRestore()
         {
-            Logger.Log("INFO: Starting download and restore procedure.");
-
             if (_wasGameRunning)
             {
-                Logger.Log("WARN: Attempted download/restore while game is running; blocking.");
-                MessageBox.Show(
-                    "Game is currently running. Please close the game before transferring files.",
-                    "Game Running",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
+                MessageBox.Show("Game is currently running. Please close the game before transferring files.",
+                                "Game Running",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                Logger.Log("User tried to do Download & Restore while game is running - blocked.");
                 return;
             }
 
-            try
-            {
-                // 1. Back up local first
-                _backupManager.BackupSaves(_localPath);
+            // 1. Back up local before overwriting
+            _backupManager.BackupSaves(_localPath);
 
-                // 2. Transfer cloud -> local
-                _backupManager.TransferFiles(_cloudPath, _localPath);
+            // 2. Transfer cloud -> local
+            _backupManager.TransferFiles(_cloudPath, _localPath);
 
-                _lastSyncTime = DateTime.Now;
-                Logger.Log("INFO: Download & Restore completed successfully.");
-                MessageBox.Show(
-                    "Download and restore from cloud complete.",
-                    "Success",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in DoDownloadAndRestore: {ex.Message}");
-                MessageBox.Show(
-                    $"Failed to download/restore saves.\n{ex.Message}",
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-            finally
-            {
-                UpdateTrayTooltip();
-            }
+            _lastSyncTime = DateTime.Now;
+            Logger.Log("Manual Download & Restore completed.");
+            MessageBox.Show("Download and restore from cloud complete.",
+                            "Success",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+
+            // Update tray tooltip
+            UpdateTrayTooltip();
         }
 
         #endregion
 
-        #region Utility
+        #region Helper Methods
 
         /// <summary>
         /// Captures the last-write time of all *.save files in the given folder.
@@ -687,32 +471,32 @@ namespace AthenaSaveRelocator
         private Dictionary<string, DateTime> TakeSaveFileSnapshot(string folder)
         {
             var snapshot = new Dictionary<string, DateTime>();
-            Logger.Log($"DEBUG: Taking snapshot of .save files in '{folder}'.");
-
             try
             {
                 var files = Directory.GetFiles(folder, "*.save");
-                foreach (var filePath in files)
+                foreach (var f in files)
                 {
-                    snapshot[filePath] = File.GetLastWriteTime(filePath);
+                    snapshot[f] = File.GetLastWriteTime(f);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"ERROR: Error taking save file snapshot in '{folder}': {ex.Message}");
+                Logger.Log($"Error taking save file snapshot in '{folder}': {ex.Message}");
             }
-
             return snapshot;
         }
 
         private string BuildTrayTooltip()
         {
-            DateTime tempLastSyncTime;
-            bool isSynced = AreSavesSynced(out tempLastSyncTime);
+            string lastSyncStr = (!AreSavesSynced(out _lastSyncTime))
+                ? "No sync yet"
+                : $"Synced {_lastSyncTime:yyyy-MM-dd HH:mm}";
 
-            string lastSyncStr = isSynced
-                ? $"🟢 Synced {tempLastSyncTime:yyyy-MM-dd HH:mm}"
-                : "No sync yet";
+            // Prepend a green circle emoji if synced
+            if (AreSavesSynced(out _lastSyncTime))
+            {
+                lastSyncStr = lastSyncStr.Replace("Synced", "🟢 Synced");
+            }
 
             string gameStatus = "No Game Monitoring";
             if (!string.IsNullOrWhiteSpace(_gameProcessName))
@@ -720,110 +504,59 @@ namespace AthenaSaveRelocator
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
             }
 
-            // Polling status
-            string pollingStatus = _pollGameTimer != null && _pollGameTimer.Enabled
-                ? "Polling Enabled"
-                : "Polling Disabled";
-
-            // Return multiline tooltip
-            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\n{pollingStatus}";
+            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
 
+        //compare the local and cloud save files return bool to see if they are synced or not 
         private bool AreSavesSynced(out DateTime lastSyncTime)
         {
-            lastSyncTime = DateTime.MinValue;
-
-            try
+            var localFiles = Directory.GetFiles(_localPath, "*.save");
+            var cloudFiles = Directory.GetFiles(_cloudPath, "*.save");
+            if (localFiles.Length != cloudFiles.Length)
             {
-                var localFiles = Directory.GetFiles(_localPath, "*.save");
-                var cloudFiles = Directory.GetFiles(_cloudPath, "*.save");
-
-                // Quick check: if counts differ, definitely not synced
-                if (localFiles.Length != cloudFiles.Length)
-                {
-                    return false;
-                }
-
-                // Compare each file
-                foreach (var localFile in localFiles)
-                {
-                    string cloudFile = System.IO.Path.Combine(_cloudPath, Path.GetFileName(localFile));
-                    if (!File.Exists(cloudFile))
-                    {
-                        return false;
-                    }
-
-                    DateTime localMod = File.GetLastWriteTime(localFile);
-                    DateTime cloudMod = File.GetLastWriteTime(cloudFile);
-                    if (localMod != cloudMod)
-                    {
-                        return false;
-                    }
-                }
-
-                // If we get here, they appear to be synced. We'll just take the local file's timestamp.
-                if (localFiles.Length > 0)
-                {
-                    lastSyncTime = File.GetLastWriteTime(localFiles[0]);
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in AreSavesSynced check: {ex.Message}");
+                lastSyncTime = DateTime.MinValue;
                 return false;
             }
+            foreach (var localFile in localFiles)
+            {
+                string cloudFile = Path.Combine(_cloudPath, Path.GetFileName(localFile));
+                if (!File.Exists(cloudFile))
+                {
+                    lastSyncTime = DateTime.MinValue;
+                    return false;
+                }
+                if (File.GetLastWriteTime(localFile) != File.GetLastWriteTime(cloudFile))
+                {
+                    lastSyncTime = DateTime.MinValue;
+                    return false;
+                }
+            }
+            //set the last sync time to the current time of the local file 
+            lastSyncTime = File.GetLastWriteTime(localFiles[0]);
+            return true;
         }
 
+
+        //update build tray tooltip
         private void UpdateTrayTooltip()
         {
-            try
-            {
-                _trayIcon.Text = BuildTrayTooltip();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Could not update tray tooltip: {ex.Message}");
-            }
+            _trayIcon.Text = BuildTrayTooltip();
         }
-
-        #endregion
-
-        #region Cleanup
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            Logger.Log("INFO: OnFormClosing triggered. Cleaning up resources.");
+            // Clean up tray icon
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
 
-            try
+            // Stop polling
+            if (_pollGameTimer != null)
             {
-                // Clean up tray icon
-                if (_trayIcon != null)
-                {
-                    _trayIcon.Visible = false;
-                    _trayIcon.Dispose();
-                }
+                _pollGameTimer.Stop();
+                _pollGameTimer.Dispose();
+            }
 
-                // Stop & dispose timers
-                if (_pollGameTimer != null)
-                {
-                    _pollGameTimer.Stop();
-                    _pollGameTimer.Dispose();
-                }
-                if (_updateCheckTimer != null)
-                {
-                    _updateCheckTimer.Stop();
-                    _updateCheckTimer.Dispose();
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"ERROR: Exception in OnFormClosing cleanup: {ex.Message}");
-            }
-            finally
-            {
-                base.OnFormClosing(e);
-            }
+            base.OnFormClosing(e);
         }
 
         #endregion
