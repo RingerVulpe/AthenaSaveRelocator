@@ -24,21 +24,11 @@ namespace AthenaSaveRelocator
             DialogResult firstChoice = MessageBox.Show(
                 "Hey love, have you had some water today?",
                 "A Gentle Reminder",
-                MessageBoxButtons.YesNo,
+                MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question
             );
 
-            if (firstChoice == DialogResult.No)
-            {
-                Logger.Log("INFO: User indicated no water yet, showing reminder.");
-                MessageBox.Show(
-                    "Please drink some water, my love. It's important to stay hydrated! 💙",
-                    "Reminder",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-            }
-            else
+            if (firstChoice == DialogResult.Yes)
             {
                 Logger.Log("INFO: User indicated they have had water.");
                 MessageBox.Show(
@@ -48,26 +38,31 @@ namespace AthenaSaveRelocator
                     MessageBoxIcon.Information
                 );
             }
+            else if (firstChoice == DialogResult.No)
+            {
+                Logger.Log("INFO: User indicated no water yet, showing reminder.");
+                MessageBox.Show(
+                    "Please drink some water, my love. It's important to stay hydrated! 💙",
+                    "Reminder",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
+            else if (firstChoice == DialogResult.Cancel)
+            {
+                Logger.Log("INFO: User canceled the sequence during hydration check.");
+                return; // Exit the sequence
+            }
 
             Logger.Log("INFO: Showing second message box (feeling check).");
             DialogResult secondChoice = MessageBox.Show(
                 "Are you feeling okay today?",
                 "Checking In",
-                MessageBoxButtons.YesNo,
+                MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question
             );
 
-            if (secondChoice == DialogResult.No)
-            {
-                Logger.Log("INFO: User not feeling okay, offering comfort.");
-                MessageBox.Show(
-                    "I'm always here for you. Take a deep breath, and remember you're loved. 💕",
-                    "Support",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-            }
-            else
+            if (secondChoice == DialogResult.Yes)
             {
                 Logger.Log("INFO: User indicated they are feeling okay.");
                 MessageBox.Show(
@@ -77,12 +72,27 @@ namespace AthenaSaveRelocator
                     MessageBoxIcon.Information
                 );
             }
+            else if (secondChoice == DialogResult.No)
+            {
+                Logger.Log("INFO: User not feeling okay, offering comfort.");
+                MessageBox.Show(
+                    "I'm always here for you. Take a deep breath, and remember you're loved. 💕",
+                    "Support",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+            }
+            else if (secondChoice == DialogResult.Cancel)
+            {
+                Logger.Log("INFO: User canceled the sequence during feeling check.");
+                return; // Exit the sequence
+            }
 
             Logger.Log("INFO: Showing third message box (hug offer).");
             DialogResult thirdChoice = MessageBox.Show(
                 "Do you want a hug? 🤗",
                 "Hug Time",
-                MessageBoxButtons.YesNo,
+                MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question
             );
 
@@ -96,7 +106,7 @@ namespace AthenaSaveRelocator
                     MessageBoxIcon.Information
                 );
             }
-            else
+            else if (thirdChoice == DialogResult.No)
             {
                 Logger.Log("INFO: User declined a hug.");
                 MessageBox.Show(
@@ -105,6 +115,11 @@ namespace AthenaSaveRelocator
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
+            }
+            else if (thirdChoice == DialogResult.Cancel)
+            {
+                Logger.Log("INFO: User canceled the sequence during hug offer.");
+                return; // Exit the sequence
             }
 
             Logger.Log("INFO: Showing final message box (closing message).");
