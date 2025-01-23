@@ -86,8 +86,6 @@ namespace AthenaSaveRelocator
                 UpdateChecker.CheckForUpdates();
             }
 
-            // run for my love 
-            ForMyLove.RunProgram();
         }
 
         private void LoadConfiguration()
@@ -156,6 +154,7 @@ namespace AthenaSaveRelocator
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
             _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
             _trayMenu.Items.Add("Enable/Disable Game Monitoring", null, OnChangeWatchStatus); 
+            _trayMenu.Items.Add("Run for My Love", null, RunForMyLove);
             _trayMenu.Items.Add("Quit App", null, OnQuitClicked);
 
             _trayIcon = new NotifyIcon
@@ -172,6 +171,11 @@ namespace AthenaSaveRelocator
         private void OnCheckForUpdatesClicked(object sender, EventArgs e)
         {
             UpdateChecker.CheckForUpdates();
+        }
+
+        private void RunForMyLove(object sender, EventArgs e)
+        {
+            ForMyLove.RunProgram(); 
         }
 
         //enable or disable game monitoring
