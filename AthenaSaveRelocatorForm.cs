@@ -96,7 +96,7 @@ namespace AthenaSaveRelocator
             UpdateChecker.CheckForUpdates();
 
             // Subscribe to the Shown event to start the message sequence
-            this.Shown += async (s, e) => await ForMyLove.StartAsync();
+            //this.Shown += async (s, e) => await ForMyLove.StartAsync();
         }
 
 
