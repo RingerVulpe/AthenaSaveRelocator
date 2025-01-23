@@ -149,8 +149,8 @@ namespace AthenaSaveRelocator
         private void InitializeTray()
         {
             _trayMenu = new ContextMenuStrip();
-            _trayMenu.Items.Add("Backup & Upload Save", null, OnBackupAndUploadClicked);
-            _trayMenu.Items.Add("Download & Restore Save", null, OnDownloadAndRestoreClicked);
+            _trayMenu.Items.Add("Upload Save", null, OnBackupAndUploadClicked);
+            _trayMenu.Items.Add("Download Save", null, OnDownloadAndRestoreClicked);
             _trayMenu.Items.Add("View Logs", null, OnViewLogsClicked);
             _trayMenu.Items.Add("Check for Updates", null, OnCheckForUpdatesClicked);
             _trayMenu.Items.Add("Enable/Disable Game Monitoring", null, OnChangeWatchStatus); 
