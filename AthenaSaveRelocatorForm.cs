@@ -70,11 +70,11 @@ namespace AthenaSaveRelocator
             _cloudChecker = new CloudChecker(_backupManager);
             _balloonNotifier = new BalloonNotifier();
 
-            // 3. Initialize tray UI
-            InitializeTray();
-
             // 4. Initialize polling timer for game detection
             InitializePollingTimer();
+
+            // 3. Initialize tray UI
+            InitializeTray();
 
             // 5. Check whether cloud is newer right after startup
             CheckCloudNewerAtStartup();
@@ -520,7 +520,7 @@ namespace AthenaSaveRelocator
             //if the polling timer is enabled then the game monitoring is enabled
             string gameMonitoringStatus = _pollGameTimer.Enabled ? "Game Monitoring Enabled" : "Game Monitoring Disabled";
 
-            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\n{gameMonitoringStatus}";
+            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\n Watch Status: {gameMonitoringStatus}";
         }
 
         //compare the local and cloud save files return bool to see if they are synced or not 
