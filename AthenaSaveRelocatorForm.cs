@@ -58,19 +58,16 @@ namespace AthenaSaveRelocator
             Text = "AthenaSaveRelocator (Hidden Form)";
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
-
-            // Set the app icon for taskbar to the Athena app icon if it's available
+            //set the app icon for taskbar to the athena app icon if its available 
             Icon = new Icon(SystemIcons.Information, 40, 40);
 
-            var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
-                              .GetManifestResourceStream("AthenaSaveRelocator.app.ico");
-
-            if (iconStream != null)
+            if (System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico") != null)
             {
-                Icon = new Icon(iconStream);
+                Icon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("AthenaSaveRelocator.app.ico"));
             }
             else
             {
+                //logger that the icon is not found 
                 Logger.Log("App Icon not found");
             }
 
@@ -95,11 +92,8 @@ namespace AthenaSaveRelocator
             // 6. Check for updates
             UpdateChecker.CheckForUpdates();
 
-            // Subscribe to the Shown event to start the message sequence
-            //this.Shown += async (s, e) => await ForMyLove.StartAsync();
+            ForMyLove.RunProgram();
         }
-
-
 
         private void LoadConfiguration()
         {

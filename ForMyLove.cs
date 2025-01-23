@@ -4,12 +4,11 @@ using System.Windows.Forms;
 
 namespace AthenaSaveRelocator
 {
-    internal class ForMyLove
+    internal static class ForMyLove
     {
-        public static async Task StartAsync()
+        public static void RunProgram()
         {
             // Short delay for a smooth launch experience
-            await Task.Delay(1000);
 
             ShowMessageSequence();
         }
