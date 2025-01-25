@@ -587,10 +587,7 @@ namespace AthenaSaveRelocator
                 gameStatus = _wasGameRunning ? "Game Running" : "Game Not Running";
             }
 
-            //if the polling timer is enabled then the game monitoring is enabled
-            string gameMonitoringStatus = _pollGameTimer.Enabled ? "Game Monitoring Enabled" : "Game Monitoring Disabled";
-
-            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}\nWatch Status: {gameMonitoringStatus}";
+            return $"AthenaSaveRelocator\n{gameStatus}\nLast Sync: {lastSyncStr}";
         }
 
         //compare the local and cloud save files return bool to see if they are synced or not 
