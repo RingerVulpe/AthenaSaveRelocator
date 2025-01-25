@@ -203,15 +203,7 @@ namespace AthenaSaveRelocator
 
             _trayMenu.Items.Add(new ToolStripSeparator());
 
-            // Monitoring Section
-            var monitoringItem = new ToolStripMenuItem("Enable Game Monitoring")
-            {
-                Image = SystemIcons.Shield.ToBitmap(), // Represents monitoring
-                Name = "monitoringToolStripMenuItem"
-            };
-            monitoringItem.Click += OnChangeWatchStatus;
-
-            _trayMenu.Items.Add(monitoringItem);
+  
 
             // Additional Actions
             var runLoveItem = new ToolStripMenuItem("Run for My Love")
@@ -239,7 +231,7 @@ namespace AthenaSaveRelocator
             _trayIcon = new NotifyIcon
             {
                 Text = BuildTrayTooltip(),
-                Icon = SystemIcons.Application, // Use a relevant system icon
+                Icon = SystemIcons.Information, // Use a relevant system icon
                 ContextMenuStrip = _trayMenu,
                 Visible = true
             };
